@@ -60,6 +60,33 @@ class _HomePageState extends State<HomePage> {
   }
 }
 
+class DataCache {
+  static final DataCache _instance = DataCache._internal();
+  factory DataCache() => _instance;
+  DataCache._internal();
+
+  List<dynamic> _regions = [];
+
+  List<dynamic> get regions => _regions;
+
+  Future<void> fetchData() async {
+    if (_regions.isEmpty) {
+      final response = await http.get(Uri.parse(
+          'https://management.srs-ssms.com/api/get_data_main?email=j&password=j'));
+      if (response.statusCode == 200) {
+        final data = jsonDecode(response.body) as List;
+        _regions = data;
+      } else {
+        throw Exception('Failed to load data');
+      }
+    }
+  }
+
+  void clearData() {
+    _regions = [];
+  }
+}
+
 class DashboardPage extends StatefulWidget {
   const DashboardPage({super.key});
 
@@ -83,20 +110,49 @@ class _DashboardPageState extends State<DashboardPage> {
   @override
   void initState() {
     super.initState();
-    _fetchData();
+    _loadData();
   }
 
-  Future<void> _fetchData() async {
-    final response = await http.get(Uri.parse(
-        'https://management.srs-ssms.com/api/get_data_main?email=j&password=j'));
-    if (response.statusCode == 200) {
-      final data = jsonDecode(response.body) as List;
-      setState(() {
-        _regions = data;
+  Future<void> _loadData() async {
+    await DataCache().fetchData();
+    setState(() {
+      _regions = DataCache().regions;
+      // Ensure that the region is reset here
+      _selectedRegion = null;
+      _selectedWilayah = null;
+      _selectedEstate = null;
+      _wilayahs = [];
+      _estates = [];
+      _afdelings = [];
+    });
+  }
+
+  void _resetFormAndFetchData() async {
+    setState(() {
+      // Reset the FormBuilder state
+      _formKey.currentState?.fields.forEach((key, field) {
+        field.reset(); // Reset each field
       });
-    } else {
-      throw Exception('Failed to load data');
-    }
+
+      // Clear selected values and dependent lists
+      _selectedRegion = null;
+      _selectedWilayah = null;
+      _selectedEstate = null;
+      _wilayahs = [];
+      _estates = [];
+      _afdelings = [];
+    });
+
+    // Fetch new data
+    await _loadData();
+
+    // Update the form fields to reflect the new data
+    setState(() {
+      _formKey.currentState?.fields['select_region']?.didChange(null);
+      _formKey.currentState?.fields['select_wilayah']?.didChange(null);
+      _formKey.currentState?.fields['select_estate']?.didChange(null);
+      _formKey.currentState?.fields['select_afdeling']?.didChange(null);
+    });
   }
 
   void _onRegionChanged(String? value) {
@@ -104,9 +160,10 @@ class _DashboardPageState extends State<DashboardPage> {
       _selectedRegion = value;
       if (_regions.isNotEmpty) {
         _wilayahs = _regions.firstWhere(
-          (region) => region['nama'] == value,
-          orElse: () => {'wilayahs': []}, // Provide a default empty map
-        )['wilayahs'];
+              (region) => region['nama'] == value,
+              orElse: () => {'wilayahs': []}, // Provide a default empty map
+            )['wilayahs'] ??
+            []; // Ensure it defaults to empty list
       }
       _selectedWilayah = null;
       _estates = [];
@@ -120,9 +177,10 @@ class _DashboardPageState extends State<DashboardPage> {
       _selectedWilayah = value;
       if (_wilayahs.isNotEmpty) {
         _estates = _wilayahs.firstWhere(
-          (wilayah) => wilayah['nama'] == value,
-          orElse: () => {'estates': []}, // Provide a default empty map
-        )['estates'];
+              (wilayah) => wilayah['nama'] == value,
+              orElse: () => {'estates': []}, // Provide a default empty map
+            )['estates'] ??
+            []; // Ensure it defaults to empty list
       }
       _selectedEstate = null;
       _afdelings = [];
@@ -134,25 +192,12 @@ class _DashboardPageState extends State<DashboardPage> {
       _selectedEstate = value;
       if (_estates.isNotEmpty) {
         _afdelings = _estates.firstWhere(
-          (estate) => estate['nama'] == value,
-          orElse: () => {'afdelings': []}, // Provide a default empty map
-        )['afdelings'];
+              (estate) => estate['nama'] == value,
+              orElse: () => {'afdelings': []}, // Provide a default empty map
+            )['afdelings'] ??
+            []; // Ensure it defaults to empty list
       }
     });
-  }
-
-  void _resetFormAndFetchData() async {
-    setState(() {
-      _formKey.currentState?.reset();
-      _selectedRegion = null;
-      _selectedWilayah = null;
-      _selectedEstate = null;
-      _regions = [];
-      _wilayahs = [];
-      _estates = [];
-      _afdelings = [];
-    });
-    await _fetchData();
   }
 
   @override
@@ -165,7 +210,6 @@ class _DashboardPageState extends State<DashboardPage> {
         padding: const EdgeInsets.all(16.0),
         child: Column(
           children: [
-            // Image at the top
             Image.asset(
               'assets/images/LOGO-SRS.png', // Replace with your image path
               width: 100,
@@ -335,13 +379,14 @@ class _DashboardPageState extends State<DashboardPage> {
                 ),
               ),
             ),
-            const SizedBox(height: 5),
             ElevatedButton(
               onPressed: () async {
                 SharedPreferences prefs = await SharedPreferences.getInstance();
                 await prefs.remove('hasSkipped'); // Clear the skip status
+                if (!context.mounted) {
+                  return; // Check if context is still mounted
+                }
                 Navigator.pushReplacement(
-                  // ignore: use_build_context_synchronously
                   context,
                   MaterialPageRoute(
                     builder: (context) => const IntroductionScreen(),
@@ -355,7 +400,7 @@ class _DashboardPageState extends State<DashboardPage> {
                   borderRadius: BorderRadius.circular(10),
                 ),
               ),
-              child: const Text('Reset to Introduction Screen'),
+              child: const Text('Kembali ke Halaman Awal'),
             ),
           ],
         ),

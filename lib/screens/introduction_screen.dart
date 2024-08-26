@@ -1,14 +1,16 @@
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
-import 'home_page.dart'; // Import your home page
+import 'home_page.dart';
 import 'package:animated_background/animated_background.dart';
+import 'package:smooth_page_indicator/smooth_page_indicator.dart';
 
 class IntroductionScreen extends StatefulWidget {
   @override
   _IntroductionScreenState createState() => _IntroductionScreenState();
 }
 
-class _IntroductionScreenState extends State<IntroductionScreen> with SingleTickerProviderStateMixin {
+class _IntroductionScreenState extends State<IntroductionScreen>
+    with SingleTickerProviderStateMixin {
   final PageController _pageController = PageController();
   bool isSkipped = false;
 
@@ -56,61 +58,82 @@ class _IntroductionScreenState extends State<IntroductionScreen> with SingleTick
             ),
             vsync: this,
             child: Container(
-              // Ensure the PageView fills the screen
               constraints: BoxConstraints.expand(),
-              // color: Colors.lightBlue[100], // Background color like blue clouds
-              child: PageView(
-                controller: _pageController,
+              child: Column(
                 children: [
-                  _buildPage(
-                    title: 'Selamat Datang',
-                    description: 'Aplikasi ini digunakan untuk menginput data curah hujan',
-                  ),
-                  _buildPage(
-                    title: 'Input Estate',
-                    description: 'Pilih Estate untuk menentukan lokasi data yang di input ',
-                  ),
-                  _buildPage(
-                    title: 'Input Data Harian',
-                    description: 'Masukan data yang sesuai fakta di lapangan',
-                  ),
-                ],
-                onPageChanged: (index) {
-                  setState(() {
-                    // Handle page change if needed
-                  });
-                },
-              ),
-            ),
-          ),
-          Align(
-            alignment: Alignment.bottomCenter,
-            child: Container(
-              color: Colors.white,
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  TextButton(
-                    onPressed: _onSkip,
-                    child: Text(
-                      'Skip',
-                      style: TextStyle(color: Colors.blue, fontSize: 16),
+                  Expanded(
+                    child: PageView(
+                      controller: _pageController,
+                      children: [
+                        _buildPage(
+                          title: 'Selamat Datang',
+                          description:
+                              'Aplikasi ini digunakan untuk menginput data curah hujan',
+                        ),
+                        _buildPage(
+                          title: 'Input Estate',
+                          description:
+                              'Pilih Estate untuk menentukan lokasi data yang di input',
+                        ),
+                        _buildPage(
+                          title: 'Input Data Harian',
+                          description:
+                              'Masukan data yang sesuai fakta di lapangan',
+                        ),
+                      ],
+                      onPageChanged: (index) {
+                        setState(() {
+                          // Handle page change if needed
+                        });
+                      },
                     ),
                   ),
-                  TextButton(
-                    onPressed: () {
-                      if (_pageController.page == 2) {
-                        _onSkip();
-                      } else {
-                        _pageController.nextPage(
-                          duration: Duration(milliseconds: 300),
-                          curve: Curves.easeInOut,
-                        );
-                      }
-                    },
-                    child: Text(
-                      'Next',
-                      style: TextStyle(color: Colors.blue, fontSize: 16),
+                  SmoothPageIndicator(
+                      controller: _pageController,
+                      count: 3, // Update this based on your page count
+                      effect: ExpandingDotsEffect(
+                        activeDotColor: Colors.blue,
+                        dotColor: Colors.grey,
+                        dotHeight: 10,
+                        dotWidth: 10,
+                        spacing: 10,
+                      )),
+                  Align(
+                    alignment: Alignment.bottomCenter,
+                    child: Container(
+                      color:
+                          Colors.transparent, // Set background to transparent
+                      padding: EdgeInsets.symmetric(horizontal: 5.0),
+                      child: Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          TextButton(
+                            onPressed: _onSkip,
+                            child: Text(
+                              'Skip',
+                              style:
+                                  TextStyle(color: Colors.blue, fontSize: 16),
+                            ),
+                          ),
+                          TextButton(
+                            onPressed: () {
+                              if (_pageController.page == 2) {
+                                _onSkip();
+                              } else {
+                                _pageController.nextPage(
+                                  duration: Duration(milliseconds: 300),
+                                  curve: Curves.easeInOut,
+                                );
+                              }
+                            },
+                            child: Text(
+                              'Next',
+                              style:
+                                  TextStyle(color: Colors.blue, fontSize: 16),
+                            ),
+                          ),
+                        ],
+                      ),
                     ),
                   ),
                 ],

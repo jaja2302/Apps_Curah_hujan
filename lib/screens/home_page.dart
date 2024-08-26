@@ -102,8 +102,12 @@ class _DashboardPageState extends State<DashboardPage> {
   void _onRegionChanged(String? value) {
     setState(() {
       _selectedRegion = value;
-      _wilayahs =
-          _regions.firstWhere((region) => region['nama'] == value)['wilayahs'];
+      if (_regions.isNotEmpty) {
+        _wilayahs = _regions.firstWhere(
+          (region) => region['nama'] == value,
+          orElse: () => {'wilayahs': []}, // Provide a default empty map
+        )['wilayahs'];
+      }
       _selectedWilayah = null;
       _estates = [];
       _selectedEstate = null;
@@ -114,8 +118,12 @@ class _DashboardPageState extends State<DashboardPage> {
   void _onWilayahChanged(String? value) {
     setState(() {
       _selectedWilayah = value;
-      _estates = _wilayahs
-          .firstWhere((wilayah) => wilayah['nama'] == value)['estates'];
+      if (_wilayahs.isNotEmpty) {
+        _estates = _wilayahs.firstWhere(
+          (wilayah) => wilayah['nama'] == value,
+          orElse: () => {'estates': []}, // Provide a default empty map
+        )['estates'];
+      }
       _selectedEstate = null;
       _afdelings = [];
     });
@@ -124,9 +132,27 @@ class _DashboardPageState extends State<DashboardPage> {
   void _onEstateChanged(String? value) {
     setState(() {
       _selectedEstate = value;
-      _afdelings =
-          _estates.firstWhere((estate) => estate['nama'] == value)['afdelings'];
+      if (_estates.isNotEmpty) {
+        _afdelings = _estates.firstWhere(
+          (estate) => estate['nama'] == value,
+          orElse: () => {'afdelings': []}, // Provide a default empty map
+        )['afdelings'];
+      }
     });
+  }
+
+  void _resetFormAndFetchData() async {
+    setState(() {
+      _formKey.currentState?.reset();
+      _selectedRegion = null;
+      _selectedWilayah = null;
+      _selectedEstate = null;
+      _regions = [];
+      _wilayahs = [];
+      _estates = [];
+      _afdelings = [];
+    });
+    await _fetchData();
   }
 
   @override
@@ -269,7 +295,9 @@ class _DashboardPageState extends State<DashboardPage> {
                           mainAxisAlignment: MainAxisAlignment.spaceBetween,
                           children: [
                             ElevatedButton(
-                              onPressed: () async {},
+                              onPressed: () async {
+                                _resetFormAndFetchData();
+                              },
                               style: ElevatedButton.styleFrom(
                                 padding: const EdgeInsets.symmetric(
                                     horizontal: 16, vertical: 12),
@@ -280,12 +308,14 @@ class _DashboardPageState extends State<DashboardPage> {
                               child: const Text('Reset Pilihan'),
                             ),
                             ElevatedButton(
-                              onPressed: () {
+                              onPressed: () async {
                                 if (_formKey.currentState?.saveAndValidate() ??
                                     false) {
                                   if (kDebugMode) {
                                     print(_formKey.currentState?.value);
                                   }
+                                  // Reset the form and fetch data again
+                                  _resetFormAndFetchData();
                                 }
                               },
                               style: ElevatedButton.styleFrom(

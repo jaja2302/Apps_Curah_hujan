@@ -1,12 +1,11 @@
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
-import 'introduction_screen.dart'; // Adjust the import based on your file structure
 import 'package:convex_bottom_bar/convex_bottom_bar.dart';
 import 'package:flutter_form_builder/flutter_form_builder.dart';
-import 'package:form_builder_validators/form_builder_validators.dart'; // Import this
-import 'dart:convert'; // Import for jsonDecode
-import 'package:http/http.dart' as http; // Import for http requests
+import 'package:form_builder_validators/form_builder_validators.dart';
+import 'dart:convert';
+import 'package:http/http.dart' as http;
 
 void main() => runApp(const MyApp());
 
@@ -25,17 +24,25 @@ class HomePage extends StatefulWidget {
   const HomePage({super.key});
 
   @override
-  // ignore: library_private_types_in_public_api
   _HomePageState createState() => _HomePageState();
 }
 
 class _HomePageState extends State<HomePage> {
   int _selectedIndex = 0;
 
-  final List<Widget> _pages = [
-    const DashboardPage(),
-    const HistoryPage(),
-  ];
+  final GlobalKey<_DashboardPageState> _dashboardKey =
+      GlobalKey<_DashboardPageState>();
+
+  final List<Widget> _pages = [];
+
+  @override
+  void initState() {
+    super.initState();
+    _pages.addAll([
+      DashboardPage(key: _dashboardKey),
+      const HistoryPage(),
+    ]);
+  }
 
   void _onItemTapped(int index) {
     setState(() {
@@ -64,7 +71,6 @@ class DashboardPage extends StatefulWidget {
   const DashboardPage({super.key});
 
   @override
-  // ignore: library_private_types_in_public_api
   _DashboardPageState createState() => _DashboardPageState();
 }
 
@@ -83,19 +89,61 @@ class _DashboardPageState extends State<DashboardPage> {
   @override
   void initState() {
     super.initState();
+    _loadFormData(); // Load saved form data
     _fetchData();
   }
 
+  Future<void> _loadFormData() async {
+    final prefs = await SharedPreferences.getInstance();
+    setState(() {
+      _selectedRegion = prefs.getString('selectedRegion');
+      _selectedWilayah = prefs.getString('selectedWilayah');
+      _selectedEstate = prefs.getString('selectedEstate');
+      _regions = jsonDecode(prefs.getString('regionsData') ?? '[]');
+      _wilayahs = jsonDecode(prefs.getString('wilayahsData') ?? '[]');
+      _estates = jsonDecode(prefs.getString('estatesData') ?? '[]');
+      _afdelings = jsonDecode(prefs.getString('afdelingsData') ?? '[]');
+    });
+  }
+
+  Future<void> _saveFormData() async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setString('selectedRegion', _selectedRegion ?? '');
+    await prefs.setString('selectedWilayah', _selectedWilayah ?? '');
+    await prefs.setString('selectedEstate', _selectedEstate ?? '');
+    await prefs.setString('regionsData', jsonEncode(_regions));
+    await prefs.setString('wilayahsData', jsonEncode(_wilayahs));
+    await prefs.setString('estatesData', jsonEncode(_estates));
+    await prefs.setString('afdelingsData', jsonEncode(_afdelings));
+  }
+
   Future<void> _fetchData() async {
-    final response = await http.get(Uri.parse(
-        'https://management.srs-ssms.com/api/get_data_main?email=j&password=j'));
-    if (response.statusCode == 200) {
-      final data = jsonDecode(response.body) as List;
+    final prefs = await SharedPreferences.getInstance();
+    final cachedData = prefs.getString('regionsData');
+
+    if (cachedData != null) {
+      final data = jsonDecode(cachedData) as List;
       setState(() {
         _regions = data;
       });
     } else {
-      throw Exception('Failed to load data');
+      try {
+        final response = await http.get(Uri.parse(
+            'https://management.srs-ssms.com/api/get_data_main?email=j&password=j'));
+        if (response.statusCode == 200) {
+          final data = jsonDecode(response.body) as List;
+          setState(() {
+            _regions = data;
+          });
+          prefs.setString('regionsData', jsonEncode(data));
+        } else {
+          throw Exception('Failed to load data');
+        }
+      } catch (e) {
+        if (kDebugMode) {
+          print(e);
+        }
+      }
     }
   }
 
@@ -109,6 +157,7 @@ class _DashboardPageState extends State<DashboardPage> {
       _selectedEstate = null;
       _afdelings = [];
     });
+    _saveFormData(); // Save form data on change
   }
 
   void _onWilayahChanged(String? value) {
@@ -119,6 +168,7 @@ class _DashboardPageState extends State<DashboardPage> {
       _selectedEstate = null;
       _afdelings = [];
     });
+    _saveFormData(); // Save form data on change
   }
 
   void _onEstateChanged(String? value) {
@@ -127,6 +177,7 @@ class _DashboardPageState extends State<DashboardPage> {
       _afdelings =
           _estates.firstWhere((estate) => estate['nama'] == value)['afdelings'];
     });
+    _saveFormData(); // Save form data on change
   }
 
   @override
@@ -139,9 +190,8 @@ class _DashboardPageState extends State<DashboardPage> {
         padding: const EdgeInsets.all(16.0),
         child: Column(
           children: [
-            // Image at the top
             Image.asset(
-              'assets/images/LOGO-SRS.png', // Replace with your image path
+              'assets/images/LOGO-SRS.png',
               width: 100,
               height: 100,
             ),
@@ -264,68 +314,61 @@ class _DashboardPageState extends State<DashboardPage> {
                             menuMaxHeight: 200,
                           ),
                         ),
-                        const SizedBox(height: 25),
-                        Row(
-                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                          children: [
-                            ElevatedButton(
-                              onPressed: () async {},
-                              style: ElevatedButton.styleFrom(
-                                padding: const EdgeInsets.symmetric(
-                                    horizontal: 16, vertical: 12),
-                                shape: RoundedRectangleBorder(
-                                  borderRadius: BorderRadius.circular(10),
-                                ),
-                              ),
-                              child: const Text('Reset Pilihan'),
-                            ),
-                            ElevatedButton(
-                              onPressed: () {
-                                if (_formKey.currentState?.saveAndValidate() ??
-                                    false) {
-                                  if (kDebugMode) {
-                                    print(_formKey.currentState?.value);
-                                  }
-                                }
-                              },
-                              style: ElevatedButton.styleFrom(
-                                padding: const EdgeInsets.symmetric(
-                                    horizontal: 16, vertical: 12),
-                                shape: RoundedRectangleBorder(
-                                  borderRadius: BorderRadius.circular(10),
-                                ),
-                              ),
-                              child: const Text('Submit'),
-                            ),
-                          ],
+                        const SizedBox(height: 20),
+                        ElevatedButton(
+                          onPressed: () async {
+                            if (_formKey.currentState?.saveAndValidate() ??
+                                false) {
+                              // Form is valid, perform actions here
+                              final selectedRegion =
+                                  _formKey.currentState?.value['select_region'];
+                              final selectedWilayah = _formKey
+                                  .currentState?.value['select_wilayah'];
+                              final selectedEstate =
+                                  _formKey.currentState?.value['select_estate'];
+                              final selectedAfdeling = _formKey
+                                  .currentState?.value['select_afdeling'];
+
+                              // Handle the selections here
+                              if (kDebugMode) {
+                                print('Selected Region: $selectedRegion');
+                                print('Selected Wilayah: $selectedWilayah');
+                                print('Selected Estate: $selectedEstate');
+                                print('Selected Afdeling: $selectedAfdeling');
+                              }
+
+                              // Clear the SharedPreferences
+                              final prefs =
+                                  await SharedPreferences.getInstance();
+                              await prefs.remove('formData');
+
+                              // Reset the form
+                              _formKey.currentState?.reset();
+
+                              // Clear state variables
+                              setState(() {
+                                _selectedRegion = null;
+                                _selectedWilayah = null;
+                                _selectedEstate = null;
+                                _afdelings = [];
+                              });
+
+                              // Force rebuild by changing key or navigation (optional)
+                              // _dashboardKey.currentState?.setState(() {}); // Force rebuild
+                            } else {
+                              // Handle validation errors here
+                              if (kDebugMode) {
+                                print('Validation failed');
+                              }
+                            }
+                          },
+                          child: const Text('Submit'),
                         ),
                       ],
                     ),
                   ),
                 ),
               ),
-            ),
-            const SizedBox(height: 5),
-            ElevatedButton(
-              onPressed: () async {
-                SharedPreferences prefs = await SharedPreferences.getInstance();
-                await prefs.remove('hasSkipped'); // Clear the skip status
-                Navigator.pushReplacement(
-                  // ignore: use_build_context_synchronously
-                  context,
-                  MaterialPageRoute(
-                    builder: (context) => const IntroductionScreen(),
-                  ),
-                );
-              },
-              style: ElevatedButton.styleFrom(
-                padding:
-                    const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(10),
-                ),
-              ),
-              child: const Text('Reset to Introduction Screen'),
             ),
           ],
         ),
@@ -344,10 +387,7 @@ class HistoryPage extends StatelessWidget {
         title: const Text('History'),
       ),
       body: const Center(
-        child: Text(
-          'This is the History Page',
-          style: TextStyle(fontSize: 24.0),
-        ),
+        child: Text('History Page'),
       ),
     );
   }

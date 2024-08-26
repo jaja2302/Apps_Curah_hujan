@@ -5,7 +5,10 @@ import 'package:animated_background/animated_background.dart';
 import 'package:smooth_page_indicator/smooth_page_indicator.dart';
 
 class IntroductionScreen extends StatefulWidget {
+  const IntroductionScreen({super.key});
+
   @override
+  // ignore: library_private_types_in_public_api
   _IntroductionScreenState createState() => _IntroductionScreenState();
 }
 
@@ -25,8 +28,9 @@ class _IntroductionScreenState extends State<IntroductionScreen>
     bool? hasSkipped = prefs.getBool('hasSkipped');
     if (hasSkipped ?? false) {
       Navigator.pushReplacement(
+        // ignore: use_build_context_synchronously
         context,
-        MaterialPageRoute(builder: (context) => HomePage()),
+        MaterialPageRoute(builder: (context) => const HomePage()),
       );
     }
   }
@@ -35,8 +39,9 @@ class _IntroductionScreenState extends State<IntroductionScreen>
     SharedPreferences prefs = await SharedPreferences.getInstance();
     await prefs.setBool('hasSkipped', true);
     Navigator.pushReplacement(
+      // ignore: use_build_context_synchronously
       context,
-      MaterialPageRoute(builder: (context) => HomePage()),
+      MaterialPageRoute(builder: (context) => const HomePage()),
     );
   }
 
@@ -47,7 +52,7 @@ class _IntroductionScreenState extends State<IntroductionScreen>
         children: [
           AnimatedBackground(
             behaviour: RandomParticleBehaviour(
-              options: ParticleOptions(
+              options: const ParticleOptions(
                 baseColor: Colors.red,
                 spawnMinSpeed: 15.0,
                 spawnMaxSpeed: 90.0,
@@ -58,7 +63,7 @@ class _IntroductionScreenState extends State<IntroductionScreen>
             ),
             vsync: this,
             child: Container(
-              constraints: BoxConstraints.expand(),
+              constraints: const BoxConstraints.expand(),
               child: Column(
                 children: [
                   Expanded(
@@ -91,7 +96,7 @@ class _IntroductionScreenState extends State<IntroductionScreen>
                   SmoothPageIndicator(
                       controller: _pageController,
                       count: 3, // Update this based on your page count
-                      effect: ExpandingDotsEffect(
+                      effect: const ExpandingDotsEffect(
                         activeDotColor: Colors.blue,
                         dotColor: Colors.grey,
                         dotHeight: 10,
@@ -103,13 +108,13 @@ class _IntroductionScreenState extends State<IntroductionScreen>
                     child: Container(
                       color:
                           Colors.transparent, // Set background to transparent
-                      padding: EdgeInsets.symmetric(horizontal: 5.0),
+                      padding: const EdgeInsets.symmetric(horizontal: 5.0),
                       child: Row(
                         mainAxisAlignment: MainAxisAlignment.spaceBetween,
                         children: [
                           TextButton(
                             onPressed: _onSkip,
-                            child: Text(
+                            child: const Text(
                               'Skip',
                               style:
                                   TextStyle(color: Colors.blue, fontSize: 16),
@@ -121,12 +126,12 @@ class _IntroductionScreenState extends State<IntroductionScreen>
                                 _onSkip();
                               } else {
                                 _pageController.nextPage(
-                                  duration: Duration(milliseconds: 300),
+                                  duration: const Duration(milliseconds: 300),
                                   curve: Curves.easeInOut,
                                 );
                               }
                             },
-                            child: Text(
+                            child: const Text(
                               'Next',
                               style:
                                   TextStyle(color: Colors.blue, fontSize: 16),
@@ -153,13 +158,13 @@ class _IntroductionScreenState extends State<IntroductionScreen>
         children: [
           Text(
             title,
-            style: TextStyle(fontSize: 24.0, fontWeight: FontWeight.bold),
+            style: const TextStyle(fontSize: 24.0, fontWeight: FontWeight.bold),
             textAlign: TextAlign.center,
           ),
-          SizedBox(height: 20),
+          const SizedBox(height: 20),
           Text(
             description,
-            style: TextStyle(fontSize: 18.0),
+            style: const TextStyle(fontSize: 18.0),
             textAlign: TextAlign.center,
           ),
         ],

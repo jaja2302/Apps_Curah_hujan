@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'introduction_screen.dart'; // Adjust the import based on your file structure
@@ -7,19 +8,24 @@ import 'package:form_builder_validators/form_builder_validators.dart'; // Import
 import 'dart:convert'; // Import for jsonDecode
 import 'package:http/http.dart' as http; // Import for http requests
 
-void main() => runApp(MyApp());
+void main() => runApp(const MyApp());
 
 class MyApp extends StatelessWidget {
+  const MyApp({super.key});
+
   @override
   Widget build(BuildContext context) {
-    return MaterialApp(
+    return const MaterialApp(
       home: HomePage(),
     );
   }
 }
 
 class HomePage extends StatefulWidget {
+  const HomePage({super.key});
+
   @override
+  // ignore: library_private_types_in_public_api
   _HomePageState createState() => _HomePageState();
 }
 
@@ -27,8 +33,8 @@ class _HomePageState extends State<HomePage> {
   int _selectedIndex = 0;
 
   final List<Widget> _pages = [
-    DashboardPage(),
-    HistoryPage(),
+    const DashboardPage(),
+    const HistoryPage(),
   ];
 
   void _onItemTapped(int index) {
@@ -43,7 +49,7 @@ class _HomePageState extends State<HomePage> {
       body: _pages[_selectedIndex],
       bottomNavigationBar: ConvexAppBar(
         style: TabStyle.react,
-        items: [
+        items: const [
           TabItem(icon: Icons.home, title: 'Dashboard'),
           TabItem(icon: Icons.history, title: 'History'),
         ],
@@ -55,7 +61,10 @@ class _HomePageState extends State<HomePage> {
 }
 
 class DashboardPage extends StatefulWidget {
+  const DashboardPage({super.key});
+
   @override
+  // ignore: library_private_types_in_public_api
   _DashboardPageState createState() => _DashboardPageState();
 }
 
@@ -124,7 +133,7 @@ class _DashboardPageState extends State<DashboardPage> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: Text('Dashboard'),
+        title: const Text('Dashboard'),
       ),
       body: Padding(
         padding: const EdgeInsets.all(16.0),
@@ -136,12 +145,12 @@ class _DashboardPageState extends State<DashboardPage> {
               width: 100,
               height: 100,
             ),
-            SizedBox(height: 20),
-            Text(
+            const SizedBox(height: 20),
+            const Text(
               'Masukkan Data aktual sesuai dengan data yang ada di lapangan',
               style: TextStyle(fontSize: 24.0, fontWeight: FontWeight.bold),
             ),
-            SizedBox(height: 20),
+            const SizedBox(height: 20),
             Expanded(
               child: SingleChildScrollView(
                 child: Center(
@@ -150,7 +159,7 @@ class _DashboardPageState extends State<DashboardPage> {
                     child: Column(
                       mainAxisSize: MainAxisSize.min,
                       children: [
-                        Container(
+                        SizedBox(
                           width: double.infinity,
                           child: FormBuilderDropdown<String>(
                             name: 'select_region',
@@ -159,7 +168,7 @@ class _DashboardPageState extends State<DashboardPage> {
                               border: OutlineInputBorder(
                                 borderRadius: BorderRadius.circular(10),
                               ),
-                              contentPadding: EdgeInsets.symmetric(
+                              contentPadding: const EdgeInsets.symmetric(
                                   horizontal: 16, vertical: 8),
                             ),
                             initialValue: _selectedRegion,
@@ -176,8 +185,8 @@ class _DashboardPageState extends State<DashboardPage> {
                             menuMaxHeight: 200,
                           ),
                         ),
-                        SizedBox(height: 20),
-                        Container(
+                        const SizedBox(height: 20),
+                        SizedBox(
                           width: double.infinity,
                           child: FormBuilderDropdown<String>(
                             name: 'select_wilayah',
@@ -186,7 +195,7 @@ class _DashboardPageState extends State<DashboardPage> {
                               border: OutlineInputBorder(
                                 borderRadius: BorderRadius.circular(10),
                               ),
-                              contentPadding: EdgeInsets.symmetric(
+                              contentPadding: const EdgeInsets.symmetric(
                                   horizontal: 16, vertical: 8),
                             ),
                             initialValue: _selectedWilayah,
@@ -203,8 +212,8 @@ class _DashboardPageState extends State<DashboardPage> {
                             menuMaxHeight: 200,
                           ),
                         ),
-                        SizedBox(height: 20),
-                        Container(
+                        const SizedBox(height: 20),
+                        SizedBox(
                           width: double.infinity,
                           child: FormBuilderDropdown<String>(
                             name: 'select_estate',
@@ -213,7 +222,7 @@ class _DashboardPageState extends State<DashboardPage> {
                               border: OutlineInputBorder(
                                 borderRadius: BorderRadius.circular(10),
                               ),
-                              contentPadding: EdgeInsets.symmetric(
+                              contentPadding: const EdgeInsets.symmetric(
                                   horizontal: 16, vertical: 8),
                             ),
                             initialValue: _selectedEstate,
@@ -230,8 +239,8 @@ class _DashboardPageState extends State<DashboardPage> {
                             menuMaxHeight: 200,
                           ),
                         ),
-                        SizedBox(height: 20),
-                        Container(
+                        const SizedBox(height: 20),
+                        SizedBox(
                           width: double.infinity,
                           child: FormBuilderDropdown<String>(
                             name: 'select_afdeling',
@@ -240,7 +249,7 @@ class _DashboardPageState extends State<DashboardPage> {
                               border: OutlineInputBorder(
                                 borderRadius: BorderRadius.circular(10),
                               ),
-                              contentPadding: EdgeInsets.symmetric(
+                              contentPadding: const EdgeInsets.symmetric(
                                   horizontal: 16, vertical: 8),
                             ),
                             items: _afdelings
@@ -255,36 +264,38 @@ class _DashboardPageState extends State<DashboardPage> {
                             menuMaxHeight: 200,
                           ),
                         ),
-                        SizedBox(height: 25),
+                        const SizedBox(height: 25),
                         Row(
                           mainAxisAlignment: MainAxisAlignment.spaceBetween,
                           children: [
                             ElevatedButton(
                               onPressed: () async {},
-                              child: Text('Reset Pilihan'),
                               style: ElevatedButton.styleFrom(
-                                padding: EdgeInsets.symmetric(
+                                padding: const EdgeInsets.symmetric(
                                     horizontal: 16, vertical: 12),
                                 shape: RoundedRectangleBorder(
                                   borderRadius: BorderRadius.circular(10),
                                 ),
                               ),
+                              child: const Text('Reset Pilihan'),
                             ),
                             ElevatedButton(
                               onPressed: () {
                                 if (_formKey.currentState?.saveAndValidate() ??
                                     false) {
-                                  print(_formKey.currentState?.value);
+                                  if (kDebugMode) {
+                                    print(_formKey.currentState?.value);
+                                  }
                                 }
                               },
-                              child: Text('Submit'),
                               style: ElevatedButton.styleFrom(
-                                padding: EdgeInsets.symmetric(
+                                padding: const EdgeInsets.symmetric(
                                     horizontal: 16, vertical: 12),
                                 shape: RoundedRectangleBorder(
                                   borderRadius: BorderRadius.circular(10),
                                 ),
                               ),
+                              child: const Text('Submit'),
                             ),
                           ],
                         ),
@@ -294,25 +305,27 @@ class _DashboardPageState extends State<DashboardPage> {
                 ),
               ),
             ),
-            SizedBox(height: 5),
+            const SizedBox(height: 5),
             ElevatedButton(
               onPressed: () async {
                 SharedPreferences prefs = await SharedPreferences.getInstance();
                 await prefs.remove('hasSkipped'); // Clear the skip status
                 Navigator.pushReplacement(
+                  // ignore: use_build_context_synchronously
                   context,
                   MaterialPageRoute(
-                    builder: (context) => IntroductionScreen(),
+                    builder: (context) => const IntroductionScreen(),
                   ),
                 );
               },
-              child: Text('Reset to Introduction Screen'),
               style: ElevatedButton.styleFrom(
-                padding: EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
                 shape: RoundedRectangleBorder(
                   borderRadius: BorderRadius.circular(10),
                 ),
               ),
+              child: const Text('Reset to Introduction Screen'),
             ),
           ],
         ),
@@ -322,13 +335,15 @@ class _DashboardPageState extends State<DashboardPage> {
 }
 
 class HistoryPage extends StatelessWidget {
+  const HistoryPage({super.key});
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: Text('History'),
+        title: const Text('History'),
       ),
-      body: Center(
+      body: const Center(
         child: Text(
           'This is the History Page',
           style: TextStyle(fontSize: 24.0),

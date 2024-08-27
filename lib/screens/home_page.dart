@@ -1,7 +1,7 @@
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
-import 'package:shared_preferences/shared_preferences.dart';
-import 'introduction_screen.dart'; // Adjust the import based on your file structure
+// import 'package:shared_preferences/shared_preferences.dart';
+// import 'introduction_screen.dart'; // Adjust the import based on your file structure
 import 'package:convex_bottom_bar/convex_bottom_bar.dart';
 import 'package:flutter_form_builder/flutter_form_builder.dart';
 import 'package:form_builder_validators/form_builder_validators.dart'; // Import this
@@ -117,7 +117,6 @@ class _DashboardPageState extends State<DashboardPage> {
     await DataCache().fetchData();
     setState(() {
       _regions = DataCache().regions;
-      // Ensure that the region is reset here
       _selectedRegion = null;
       _selectedWilayah = null;
       _selectedEstate = null;
@@ -129,12 +128,10 @@ class _DashboardPageState extends State<DashboardPage> {
 
   void _resetFormAndFetchData() async {
     setState(() {
-      // Reset the FormBuilder state
       _formKey.currentState?.fields.forEach((key, field) {
-        field.reset(); // Reset each field
+        field.reset();
       });
 
-      // Clear selected values and dependent lists
       _selectedRegion = null;
       _selectedWilayah = null;
       _selectedEstate = null;
@@ -143,10 +140,8 @@ class _DashboardPageState extends State<DashboardPage> {
       _afdelings = [];
     });
 
-    // Fetch new data
     await _loadData();
 
-    // Update the form fields to reflect the new data
     setState(() {
       _formKey.currentState?.fields['select_region']?.didChange(null);
       _formKey.currentState?.fields['select_wilayah']?.didChange(null);
@@ -159,11 +154,13 @@ class _DashboardPageState extends State<DashboardPage> {
     setState(() {
       _selectedRegion = value;
       if (_regions.isNotEmpty) {
-        _wilayahs = _regions.firstWhere(
-              (region) => region['nama'] == value,
-              orElse: () => {'wilayahs': []}, // Provide a default empty map
-            )['wilayahs'] ??
-            []; // Ensure it defaults to empty list
+        final region = _regions.firstWhere(
+          (region) => region['id'].toString() == value,
+          orElse: () => {'wilayahs': []},
+        );
+
+        // Use `region['wilayahs'] ?? []` to ensure it's not null
+        _wilayahs = region['wilayahs'] as List<dynamic>? ?? [];
       }
       _selectedWilayah = null;
       _estates = [];
@@ -176,11 +173,13 @@ class _DashboardPageState extends State<DashboardPage> {
     setState(() {
       _selectedWilayah = value;
       if (_wilayahs.isNotEmpty) {
-        _estates = _wilayahs.firstWhere(
-              (wilayah) => wilayah['nama'] == value,
-              orElse: () => {'estates': []}, // Provide a default empty map
-            )['estates'] ??
-            []; // Ensure it defaults to empty list
+        final wilayah = _wilayahs.firstWhere(
+          (wilayah) => wilayah['id'].toString() == value,
+          orElse: () => {'estates': []},
+        );
+
+        // Use `wilayah['estates'] ?? []` to ensure it's not null
+        _estates = wilayah['estates'] as List<dynamic>? ?? [];
       }
       _selectedEstate = null;
       _afdelings = [];
@@ -191,13 +190,64 @@ class _DashboardPageState extends State<DashboardPage> {
     setState(() {
       _selectedEstate = value;
       if (_estates.isNotEmpty) {
-        _afdelings = _estates.firstWhere(
-              (estate) => estate['nama'] == value,
-              orElse: () => {'afdelings': []}, // Provide a default empty map
-            )['afdelings'] ??
-            []; // Ensure it defaults to empty list
+        final estate = _estates.firstWhere(
+          (estate) => estate['id'].toString() == value,
+          orElse: () => {'afdelings': []},
+        );
+
+        // Use `estate['afdelings'] ?? []` to ensure it's not null
+        _afdelings = estate['afdelings'] as List<dynamic>? ?? [];
       }
     });
+  }
+
+  void _onSubmit() async {
+    if (_formKey.currentState?.saveAndValidate() ?? false) {
+      final formData = _formKey.currentState?.value;
+
+      // Helper method to find the name based on the id
+      String findNameById(List<dynamic> list, String id, String nameKey) {
+        return list.firstWhere(
+              (item) => item['id'].toString() == id,
+              orElse: () => {nameKey: ''},
+            )[nameKey] ??
+            '';
+      }
+
+      final afdId = formData?['select_afdeling'] ?? '';
+      final estId = formData?['select_estate'] ?? '';
+
+      final afdNama = findNameById(_afdelings, afdId, 'nama');
+      final estNama = findNameById(_estates, estId, 'est');
+
+      final response = await http.post(
+        Uri.parse('https://management.srs-ssms.com/api/curah_hujan'),
+        body: {
+          'email': 'j',
+          'password': 'j',
+          'afd': afdNama,
+          'est': estNama,
+          'ch': (formData?['value_curah_hujan'] ?? '').toString(),
+          'afd_id': afdId,
+          'est_id': estId,
+        },
+      );
+
+      if (response.statusCode == 200) {
+        if (kDebugMode) {
+          print('Data successfully posted');
+        }
+        // Handle success (e.g., show a success message)
+      } else {
+        if (kDebugMode) {
+          print('Failed to post data: ${response.body}');
+        }
+        // Handle failure (e.g., show an error message)
+      }
+
+      // Reset form and data if needed
+      _resetFormAndFetchData();
+    }
   }
 
   @override
@@ -211,7 +261,7 @@ class _DashboardPageState extends State<DashboardPage> {
         child: Column(
           children: [
             Image.asset(
-              'assets/images/LOGO-SRS.png', // Replace with your image path
+              'assets/images/LOGO-SRS.png',
               width: 100,
               height: 100,
             ),
@@ -245,7 +295,7 @@ class _DashboardPageState extends State<DashboardPage> {
                             items: _regions
                                 .map<DropdownMenuItem<String>>((region) {
                               return DropdownMenuItem<String>(
-                                value: region['nama'],
+                                value: region['id'].toString(),
                                 child: Text(region['nama']),
                               );
                             }).toList(),
@@ -272,7 +322,7 @@ class _DashboardPageState extends State<DashboardPage> {
                             items: _wilayahs
                                 .map<DropdownMenuItem<String>>((wilayah) {
                               return DropdownMenuItem<String>(
-                                value: wilayah['nama'],
+                                value: wilayah['id'].toString(),
                                 child: Text(wilayah['nama']),
                               );
                             }).toList(),
@@ -299,7 +349,7 @@ class _DashboardPageState extends State<DashboardPage> {
                             items: _estates
                                 .map<DropdownMenuItem<String>>((estate) {
                               return DropdownMenuItem<String>(
-                                value: estate['nama'],
+                                value: estate['id'].toString(),
                                 child: Text(estate['nama']),
                               );
                             }).toList(),
@@ -325,13 +375,41 @@ class _DashboardPageState extends State<DashboardPage> {
                             items: _afdelings
                                 .map<DropdownMenuItem<String>>((afdeling) {
                               return DropdownMenuItem<String>(
-                                value: afdeling['nama'],
+                                value: afdeling['id'].toString(),
                                 child: Text(afdeling['nama']),
                               );
                             }).toList(),
                             validator: FormBuilderValidators.compose(
                                 [FormBuilderValidators.required()]),
                             menuMaxHeight: 200,
+                          ),
+                        ),
+                        const SizedBox(height: 20),
+                        SizedBox(
+                          width: double.infinity,
+                          child: FormBuilderTextField(
+                            name: 'value_curah_hujan',
+                            decoration: InputDecoration(
+                              labelText: 'Curah Hujan Data',
+                              border: OutlineInputBorder(
+                                borderRadius: BorderRadius.circular(10),
+                              ),
+                              contentPadding: const EdgeInsets.symmetric(
+                                  horizontal: 16, vertical: 8),
+                            ),
+                            keyboardType: const TextInputType.numberWithOptions(
+                                decimal: true),
+                            validator: FormBuilderValidators.compose([
+                              FormBuilderValidators.required(),
+                              FormBuilderValidators.numeric(),
+                              (value) {
+                                final regex = RegExp(r'^\d*\.?\d*$');
+                                if (!regex.hasMatch(value ?? '')) {
+                                  return 'Please enter a valid decimal number';
+                                }
+                                return null;
+                              },
+                            ]),
                           ),
                         ),
                         const SizedBox(height: 25),
@@ -342,34 +420,13 @@ class _DashboardPageState extends State<DashboardPage> {
                               onPressed: () async {
                                 _resetFormAndFetchData();
                               },
-                              style: ElevatedButton.styleFrom(
-                                padding: const EdgeInsets.symmetric(
-                                    horizontal: 16, vertical: 12),
-                                shape: RoundedRectangleBorder(
-                                  borderRadius: BorderRadius.circular(10),
-                                ),
-                              ),
                               child: const Text('Reset Pilihan'),
                             ),
                             ElevatedButton(
                               onPressed: () async {
-                                if (_formKey.currentState?.saveAndValidate() ??
-                                    false) {
-                                  if (kDebugMode) {
-                                    print(_formKey.currentState?.value);
-                                  }
-                                  // Reset the form and fetch data again
-                                  _resetFormAndFetchData();
-                                }
+                                _onSubmit();
                               },
-                              style: ElevatedButton.styleFrom(
-                                padding: const EdgeInsets.symmetric(
-                                    horizontal: 16, vertical: 12),
-                                shape: RoundedRectangleBorder(
-                                  borderRadius: BorderRadius.circular(10),
-                                ),
-                              ),
-                              child: const Text('Submit'),
+                              child: const Text('Kirim Data'),
                             ),
                           ],
                         ),
@@ -378,29 +435,6 @@ class _DashboardPageState extends State<DashboardPage> {
                   ),
                 ),
               ),
-            ),
-            ElevatedButton(
-              onPressed: () async {
-                SharedPreferences prefs = await SharedPreferences.getInstance();
-                await prefs.remove('hasSkipped'); // Clear the skip status
-                if (!context.mounted) {
-                  return; // Check if context is still mounted
-                }
-                Navigator.pushReplacement(
-                  context,
-                  MaterialPageRoute(
-                    builder: (context) => const IntroductionScreen(),
-                  ),
-                );
-              },
-              style: ElevatedButton.styleFrom(
-                padding:
-                    const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(10),
-                ),
-              ),
-              child: const Text('Kembali ke Halaman Awal'),
             ),
           ],
         ),

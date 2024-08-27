@@ -1,7 +1,19 @@
 import 'package:flutter/material.dart';
 import 'screens/introduction_screen.dart'; // Import layar pengenalan
+import 'package:hive_flutter/hive_flutter.dart';
+import 'screens/history.dart'; // Import your History model
 
-void main() {
+Future<void> main() async {
+  WidgetsFlutterBinding.ensureInitialized();
+
+  try {
+    await Hive.initFlutter();
+    Hive.registerAdapter(HistoryAdapter()); // Register your adapter
+    await Hive.openBox<History>('historyBox'); // Open the Hive box
+  } catch (e) {
+    print("Hive initialization error: $e");
+  }
+
   runApp(const MyApp());
 }
 

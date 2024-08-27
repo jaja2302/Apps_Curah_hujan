@@ -69,8 +69,10 @@ class _IntroductionScreenState extends State<IntroductionScreen>
     // Simulate a delay to show the loading animation (optional)
     await Future.delayed(const Duration(seconds: 2));
 
+    // ignore: use_build_context_synchronously
     Navigator.pop(context); // Close the loading screen
     Navigator.pushReplacement(
+      // ignore: use_build_context_synchronously
       context,
       MaterialPageRoute(builder: (context) => const HomePage()),
     );

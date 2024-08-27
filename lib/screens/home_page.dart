@@ -9,8 +9,21 @@ import 'dart:convert'; // Import for jsonDecode
 import 'package:http/http.dart' as http; // Import for http requests
 import 'package:fluttertoast/fluttertoast.dart';
 import 'package:lottie/lottie.dart';
+import 'package:hive_flutter/hive_flutter.dart';
+import 'history.dart'; // Import your History model
 
-void main() => runApp(const MyApp());
+void main() async {
+  // Ensure that plugin services are initialized so that Hive can use them
+  WidgetsFlutterBinding.ensureInitialized();
+
+  // Initialize Hive
+  await Hive.initFlutter();
+
+  // Register adapters if you have any custom types
+  Hive.registerAdapter(HistoryAdapter());
+
+  runApp(const MyApp());
+}
 
 class MyApp extends StatelessWidget {
   const MyApp({super.key});
@@ -68,7 +81,7 @@ class DataCache {
   DataCache._internal();
 
   List<dynamic> _regions = [];
-  List<Map<String, dynamic>> _submittedData = [];
+  Box<History>? _historyBox;
 
   List<dynamic> get regions => _regions;
 
@@ -86,26 +99,34 @@ class DataCache {
   }
 
   Future<void> loadSubmittedData() async {
-    final prefs = await SharedPreferences.getInstance();
-    final jsonString = prefs.getString('submittedData') ?? '[]';
-    _submittedData = List<Map<String, dynamic>>.from(jsonDecode(jsonString));
+    if (!Hive.isBoxOpen('historyBox')) {
+      _historyBox = await Hive.openBox<History>('historyBox');
+    } else {
+      _historyBox = Hive.box<History>('historyBox');
+    }
   }
 
   Future<void> addData(Map<String, dynamic> data) async {
-    _submittedData.add(data);
-    final prefs = await SharedPreferences.getInstance();
-    await prefs.setString('submittedData', jsonEncode(_submittedData));
+    if (_historyBox == null) await loadSubmittedData();
+
+    final history = History(
+      afd: data['afd'],
+      est: data['est'],
+      ch: data['ch'],
+      afdId: data['afd_id'],
+      estId: data['est_id'],
+    );
+    await _historyBox?.add(history);
   }
 
-  List<Map<String, dynamic>> getData() {
-    return _submittedData;
+  List<History> getData() {
+    if (_historyBox == null) return [];
+    return _historyBox?.values.toList() ?? [];
   }
 
   Future<void> clearData() async {
-    _regions = [];
-    _submittedData = [];
-    final prefs = await SharedPreferences.getInstance();
-    await prefs.remove('submittedData');
+    if (_historyBox == null) await loadSubmittedData();
+    await _historyBox?.clear();
   }
 }
 
@@ -591,7 +612,7 @@ class _DashboardPageState extends State<DashboardPage> {
                   borderRadius: BorderRadius.circular(10),
                 ),
               ),
-              child: const Text('Kembali ke Halaman Awal'),
+              child: const Text('Kembali ke Halaman Utama'),
             ),
           ],
         ),
@@ -609,19 +630,47 @@ class HistoryPage extends StatefulWidget {
 }
 
 class _HistoryPageState extends State<HistoryPage> {
-  List<Map<String, dynamic>> cachedData = [];
+  List<History> cachedData = [];
+  List<History> filteredData = [];
+  final TextEditingController _filterController = TextEditingController();
 
   @override
   void initState() {
     super.initState();
     _loadData();
+    _filterController.addListener(_filterData);
   }
 
   Future<void> _loadData() async {
     await DataCache().loadSubmittedData();
     setState(() {
       cachedData = DataCache().getData();
+      filteredData = cachedData; // Initialize with all data
     });
+  }
+
+  void _filterData() {
+    final query = _filterController.text.toLowerCase();
+    setState(() {
+      filteredData = cachedData.where((history) {
+        return history.est.toLowerCase().contains(query);
+      }).toList();
+    });
+  }
+
+  Future<void> _clearData() async {
+    var box = await Hive.openBox('historyBox'); // Open your Hive box
+    await box.clear(); // Clear all data in the box
+    setState(() {
+      cachedData.clear();
+      filteredData.clear();
+    });
+  }
+
+  @override
+  void dispose() {
+    _filterController.dispose();
+    super.dispose();
   }
 
   @override
@@ -632,42 +681,67 @@ class _HistoryPageState extends State<HistoryPage> {
           children: [
             Image.asset(
               'assets/images/LOGO-SRS.png',
-              width: 40, // Adjust the size as needed
+              width: 40,
               height: 40,
             ),
-            const SizedBox(
-                width: 10), // Add some space between the logo and title
+            const SizedBox(width: 10),
             const Text(
-              'HIstory',
+              'History',
               style: TextStyle(fontSize: 16.0),
             ),
           ],
         ),
-      ),
-      body: Center(
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            const Text(
-              'This is the History Page',
-              style: TextStyle(fontSize: 24.0),
+        bottom: PreferredSize(
+          preferredSize: const Size.fromHeight(50.0),
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 16.0),
+            child: TextField(
+              controller: _filterController,
+              decoration: InputDecoration(
+                labelText: 'Cari Estate',
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(10),
+                ),
+                contentPadding: const EdgeInsets.symmetric(horizontal: 16.0),
+              ),
+              onChanged: (value) => _filterData(),
             ),
-            const SizedBox(height: 20),
-            Expanded(
-              child: ListView.builder(
-                itemCount: cachedData.length,
-                itemBuilder: (context, index) {
-                  final item = cachedData[index];
-                  return ListTile(
-                    title: Text('Afdeling: ${item['afd']}'),
-                    subtitle:
-                        Text('Estate: ${item['est']} - CH: ${item['ch']}'),
-                  );
-                },
+          ),
+        ),
+      ),
+      body: ListView.builder(
+        itemCount: filteredData.length,
+        itemBuilder: (context, index) {
+          final history = filteredData[index];
+          return Card(
+            margin: const EdgeInsets.symmetric(vertical: 8.0, horizontal: 16.0),
+            child: SizedBox(
+              height: 100, // Set a fixed height for each card
+              child: Row(
+                children: [
+                  Expanded(
+                    child: ListTile(
+                      title: Text("${history.afd} - ${history.est}"),
+                      subtitle: Text("Curah Hujan: ${history.ch}"),
+                    ),
+                  ),
+                  IconButton(
+                    tooltip: 'Hapus History',
+                    icon: const Icon(Icons.delete),
+                    onPressed: () {
+                      // Add your deletion logic here if needed
+                    },
+                  ),
+                ],
               ),
             ),
-          ],
-        ),
+          );
+        },
+      ),
+      floatingActionButton: FloatingActionButton(
+        onPressed: _clearData,
+        tooltip: 'Hapus Semua Data',
+        child: Icon(Icons.delete_forever),
       ),
     );
   }

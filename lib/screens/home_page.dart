@@ -1,12 +1,13 @@
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
-// import 'package:shared_preferences/shared_preferences.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 // import 'introduction_screen.dart'; // Adjust the import based on your file structure
 import 'package:convex_bottom_bar/convex_bottom_bar.dart';
 import 'package:flutter_form_builder/flutter_form_builder.dart';
 import 'package:form_builder_validators/form_builder_validators.dart'; // Import this
 import 'dart:convert'; // Import for jsonDecode
 import 'package:http/http.dart' as http; // Import for http requests
+import 'package:fluttertoast/fluttertoast.dart';
 
 void main() => runApp(const MyApp());
 
@@ -66,6 +67,7 @@ class DataCache {
   DataCache._internal();
 
   List<dynamic> _regions = [];
+  List<Map<String, dynamic>> _submittedData = [];
 
   List<dynamic> get regions => _regions;
 
@@ -82,8 +84,27 @@ class DataCache {
     }
   }
 
-  void clearData() {
+  Future<void> loadSubmittedData() async {
+    final prefs = await SharedPreferences.getInstance();
+    final jsonString = prefs.getString('submittedData') ?? '[]';
+    _submittedData = List<Map<String, dynamic>>.from(jsonDecode(jsonString));
+  }
+
+  Future<void> addData(Map<String, dynamic> data) async {
+    _submittedData.add(data);
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setString('submittedData', jsonEncode(_submittedData));
+  }
+
+  List<Map<String, dynamic>> getData() {
+    return _submittedData;
+  }
+
+  Future<void> clearData() async {
     _regions = [];
+    _submittedData = [];
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.remove('submittedData');
   }
 }
 
@@ -232,21 +253,36 @@ class _DashboardPageState extends State<DashboardPage> {
           'est_id': estId,
         },
       );
-
       if (response.statusCode == 200) {
-        if (kDebugMode) {
-          print('Data successfully posted');
-        }
-        // Handle success (e.g., show a success message)
-      } else {
-        if (kDebugMode) {
-          print('Failed to post data: ${response.body}');
-        }
-        // Handle failure (e.g., show an error message)
-      }
+        Fluttertoast.showToast(
+          msg: "Data berhasil diunggah",
+          toastLength: Toast.LENGTH_SHORT,
+          gravity: ToastGravity.BOTTOM,
+          backgroundColor: Colors.green,
+          textColor: Colors.white,
+          fontSize: 16.0,
+        );
 
-      // Reset form and data if needed
-      _resetFormAndFetchData();
+        // Cache the submitted data
+        await DataCache().addData({
+          'afd': afdNama,
+          'est': estNama,
+          'ch': (formData?['value_curah_hujan'] ?? '').toString(),
+          'afd_id': afdId,
+          'est_id': estId,
+        });
+
+        _resetFormAndFetchData();
+      } else {
+        Fluttertoast.showToast(
+          msg: "Gagal mengunggah data",
+          toastLength: Toast.LENGTH_SHORT,
+          gravity: ToastGravity.BOTTOM,
+          backgroundColor: Colors.red,
+          textColor: Colors.white,
+          fontSize: 16.0,
+        );
+      }
     }
   }
 
@@ -443,8 +479,29 @@ class _DashboardPageState extends State<DashboardPage> {
   }
 }
 
-class HistoryPage extends StatelessWidget {
+class HistoryPage extends StatefulWidget {
   const HistoryPage({super.key});
+
+  @override
+  // ignore: library_private_types_in_public_api
+  _HistoryPageState createState() => _HistoryPageState();
+}
+
+class _HistoryPageState extends State<HistoryPage> {
+  List<Map<String, dynamic>> cachedData = [];
+
+  @override
+  void initState() {
+    super.initState();
+    _loadData();
+  }
+
+  Future<void> _loadData() async {
+    await DataCache().loadSubmittedData();
+    setState(() {
+      cachedData = DataCache().getData();
+    });
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -452,10 +509,29 @@ class HistoryPage extends StatelessWidget {
       appBar: AppBar(
         title: const Text('History'),
       ),
-      body: const Center(
-        child: Text(
-          'This is the History Page',
-          style: TextStyle(fontSize: 24.0),
+      body: Center(
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            const Text(
+              'This is the History Page',
+              style: TextStyle(fontSize: 24.0),
+            ),
+            const SizedBox(height: 20),
+            Expanded(
+              child: ListView.builder(
+                itemCount: cachedData.length,
+                itemBuilder: (context, index) {
+                  final item = cachedData[index];
+                  return ListTile(
+                    title: Text('Afdeling: ${item['afd']}'),
+                    subtitle:
+                        Text('Estate: ${item['est']} - CH: ${item['ch']}'),
+                  );
+                },
+              ),
+            ),
+          ],
         ),
       ),
     );

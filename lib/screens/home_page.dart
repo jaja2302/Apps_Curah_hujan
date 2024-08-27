@@ -1,7 +1,7 @@
-import 'package:flutter/foundation.dart';
+// import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
-// import 'introduction_screen.dart'; // Adjust the import based on your file structure
+import 'introduction_screen.dart'; // Adjust the import based on your file structure
 import 'package:convex_bottom_bar/convex_bottom_bar.dart';
 import 'package:flutter_form_builder/flutter_form_builder.dart';
 import 'package:form_builder_validators/form_builder_validators.dart'; // Import this
@@ -315,110 +315,118 @@ class _DashboardPageState extends State<DashboardPage> {
                     child: Column(
                       mainAxisSize: MainAxisSize.min,
                       children: [
-                        SizedBox(
-                          width: double.infinity,
-                          child: FormBuilderDropdown<String>(
-                            name: 'select_region',
-                            decoration: InputDecoration(
-                              labelText: 'Pilih Regional',
-                              border: OutlineInputBorder(
-                                borderRadius: BorderRadius.circular(10),
+                        // Row for Regional and Wilayah
+                        Row(
+                          children: [
+                            Expanded(
+                              child: FormBuilderDropdown<String>(
+                                name: 'select_region',
+                                decoration: InputDecoration(
+                                  labelText: 'Pilih Regional',
+                                  border: OutlineInputBorder(
+                                    borderRadius: BorderRadius.circular(5),
+                                  ),
+                                  contentPadding: const EdgeInsets.symmetric(
+                                      horizontal: 16, vertical: 8),
+                                ),
+                                initialValue: _selectedRegion,
+                                items: _regions
+                                    .map<DropdownMenuItem<String>>((region) {
+                                  return DropdownMenuItem<String>(
+                                    value: region['id'].toString(),
+                                    child: Text(region['nama']),
+                                  );
+                                }).toList(),
+                                onChanged: _onRegionChanged,
+                                validator: FormBuilderValidators.compose(
+                                    [FormBuilderValidators.required()]),
+                                menuMaxHeight: 200,
                               ),
-                              contentPadding: const EdgeInsets.symmetric(
-                                  horizontal: 16, vertical: 8),
                             ),
-                            initialValue: _selectedRegion,
-                            items: _regions
-                                .map<DropdownMenuItem<String>>((region) {
-                              return DropdownMenuItem<String>(
-                                value: region['id'].toString(),
-                                child: Text(region['nama']),
-                              );
-                            }).toList(),
-                            onChanged: _onRegionChanged,
-                            validator: FormBuilderValidators.compose(
-                                [FormBuilderValidators.required()]),
-                            menuMaxHeight: 200,
-                          ),
+                            const SizedBox(
+                                width: 10), // Spacer between dropdowns
+                            Expanded(
+                              child: FormBuilderDropdown<String>(
+                                name: 'select_wilayah',
+                                decoration: InputDecoration(
+                                  labelText: 'Pilih Wilayah',
+                                  border: OutlineInputBorder(
+                                    borderRadius: BorderRadius.circular(10),
+                                  ),
+                                  contentPadding: const EdgeInsets.symmetric(
+                                      horizontal: 16, vertical: 8),
+                                ),
+                                initialValue: _selectedWilayah,
+                                items: _wilayahs
+                                    .map<DropdownMenuItem<String>>((wilayah) {
+                                  return DropdownMenuItem<String>(
+                                    value: wilayah['id'].toString(),
+                                    child: Text(wilayah['nama']),
+                                  );
+                                }).toList(),
+                                onChanged: _onWilayahChanged,
+                                validator: FormBuilderValidators.compose(
+                                    [FormBuilderValidators.required()]),
+                                menuMaxHeight: 200,
+                              ),
+                            ),
+                          ],
                         ),
                         const SizedBox(height: 20),
-                        SizedBox(
-                          width: double.infinity,
-                          child: FormBuilderDropdown<String>(
-                            name: 'select_wilayah',
-                            decoration: InputDecoration(
-                              labelText: 'Pilih Wilayah',
-                              border: OutlineInputBorder(
-                                borderRadius: BorderRadius.circular(10),
+                        // Row for Estate and Afdeling
+                        Row(
+                          children: [
+                            Expanded(
+                              child: FormBuilderDropdown<String>(
+                                name: 'select_estate',
+                                decoration: InputDecoration(
+                                  labelText: 'Pilih Estate',
+                                  border: OutlineInputBorder(
+                                    borderRadius: BorderRadius.circular(10),
+                                  ),
+                                  contentPadding: const EdgeInsets.symmetric(
+                                      horizontal: 16, vertical: 8),
+                                ),
+                                initialValue: _selectedEstate,
+                                items: _estates
+                                    .map<DropdownMenuItem<String>>((estate) {
+                                  return DropdownMenuItem<String>(
+                                    value: estate['id'].toString(),
+                                    child: Text(estate['nama']),
+                                  );
+                                }).toList(),
+                                onChanged: _onEstateChanged,
+                                validator: FormBuilderValidators.compose(
+                                    [FormBuilderValidators.required()]),
+                                menuMaxHeight: 200,
                               ),
-                              contentPadding: const EdgeInsets.symmetric(
-                                  horizontal: 16, vertical: 8),
                             ),
-                            initialValue: _selectedWilayah,
-                            items: _wilayahs
-                                .map<DropdownMenuItem<String>>((wilayah) {
-                              return DropdownMenuItem<String>(
-                                value: wilayah['id'].toString(),
-                                child: Text(wilayah['nama']),
-                              );
-                            }).toList(),
-                            onChanged: _onWilayahChanged,
-                            validator: FormBuilderValidators.compose(
-                                [FormBuilderValidators.required()]),
-                            menuMaxHeight: 200,
-                          ),
-                        ),
-                        const SizedBox(height: 20),
-                        SizedBox(
-                          width: double.infinity,
-                          child: FormBuilderDropdown<String>(
-                            name: 'select_estate',
-                            decoration: InputDecoration(
-                              labelText: 'Pilih Estate',
-                              border: OutlineInputBorder(
-                                borderRadius: BorderRadius.circular(10),
+                            const SizedBox(
+                                width: 10), // Spacer between dropdowns
+                            Expanded(
+                              child: FormBuilderDropdown<String>(
+                                name: 'select_afdeling',
+                                decoration: InputDecoration(
+                                  labelText: 'Pilih Afdeling',
+                                  border: OutlineInputBorder(
+                                    borderRadius: BorderRadius.circular(10),
+                                  ),
+                                  contentPadding: const EdgeInsets.symmetric(
+                                      horizontal: 16, vertical: 8),
+                                ),
+                                items: _afdelings
+                                    .map<DropdownMenuItem<String>>((afdeling) {
+                                  return DropdownMenuItem<String>(
+                                    value: afdeling['id'].toString(),
+                                    child: Text(afdeling['nama']),
+                                  );
+                                }).toList(),
+                                validator: FormBuilderValidators.compose(
+                                    [FormBuilderValidators.required()]),
+                                menuMaxHeight: 200,
                               ),
-                              contentPadding: const EdgeInsets.symmetric(
-                                  horizontal: 16, vertical: 8),
                             ),
-                            initialValue: _selectedEstate,
-                            items: _estates
-                                .map<DropdownMenuItem<String>>((estate) {
-                              return DropdownMenuItem<String>(
-                                value: estate['id'].toString(),
-                                child: Text(estate['nama']),
-                              );
-                            }).toList(),
-                            onChanged: _onEstateChanged,
-                            validator: FormBuilderValidators.compose(
-                                [FormBuilderValidators.required()]),
-                            menuMaxHeight: 200,
-                          ),
-                        ),
-                        const SizedBox(height: 20),
-                        SizedBox(
-                          width: double.infinity,
-                          child: FormBuilderDropdown<String>(
-                            name: 'select_afdeling',
-                            decoration: InputDecoration(
-                              labelText: 'Pilih Afdeling',
-                              border: OutlineInputBorder(
-                                borderRadius: BorderRadius.circular(10),
-                              ),
-                              contentPadding: const EdgeInsets.symmetric(
-                                  horizontal: 16, vertical: 8),
-                            ),
-                            items: _afdelings
-                                .map<DropdownMenuItem<String>>((afdeling) {
-                              return DropdownMenuItem<String>(
-                                value: afdeling['id'].toString(),
-                                child: Text(afdeling['nama']),
-                              );
-                            }).toList(),
-                            validator: FormBuilderValidators.compose(
-                                [FormBuilderValidators.required()]),
-                            menuMaxHeight: 200,
-                          ),
+                          ],
                         ),
                         const SizedBox(height: 20),
                         SizedBox(
@@ -439,7 +447,7 @@ class _DashboardPageState extends State<DashboardPage> {
                               FormBuilderValidators.required(),
                               FormBuilderValidators.numeric(),
                               (value) {
-                                final regex = RegExp(r'^\d*\.?\d*$');
+                                final regex = RegExp(r'^\d*\.?\d*');
                                 if (!regex.hasMatch(value ?? '')) {
                                   return 'Please enter a valid decimal number';
                                 }

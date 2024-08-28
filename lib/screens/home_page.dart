@@ -1,8 +1,8 @@
 // import 'package:flutter/foundation.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
-import 'package:shared_preferences/shared_preferences.dart';
-import 'introduction_screen.dart'; // Adjust the import based on your file structure
+// import 'package:shared_preferences/shared_preferences.dart';
+// import 'introduction_screen.dart'; // Adjust the import based on your file structure
 import 'package:convex_bottom_bar/convex_bottom_bar.dart';
 import 'package:flutter_form_builder/flutter_form_builder.dart';
 import 'package:form_builder_validators/form_builder_validators.dart'; // Import this
@@ -12,10 +12,10 @@ import 'package:fluttertoast/fluttertoast.dart';
 import 'package:lottie/lottie.dart';
 import 'package:hive_flutter/hive_flutter.dart';
 import '../utils/models.dart'; // Import your History model
-import '../utils/Location.dart'; // Adjust the import path as necessary
 import 'package:flutter/services.dart'; // Import for Clipboard
 import 'package:flutter_map/flutter_map.dart';
 import 'package:latlong2/latlong.dart';
+import 'package:geolocator/geolocator.dart';
 
 void main() async {
   // Ensure that plugin services are initialized so that Hive can use them
@@ -146,11 +146,14 @@ class DashboardPage extends StatefulWidget {
 class _DashboardPageState extends State<DashboardPage> {
   final _formKey = GlobalKey<FormBuilderState>();
   List<EstatePlot> _selectedEstatePlots = [];
+  bool _isSubmitButtonEnabled = true;
 
   List<dynamic> _regions = [];
   List<dynamic> _wilayahs = [];
   List<dynamic> _estates = [];
   List<dynamic> _afdelings = [];
+  double _currentLat = 0.0;
+  double _currentLon = 0.0;
 
   String? _selectedRegion;
   String? _selectedWilayah;
@@ -158,26 +161,31 @@ class _DashboardPageState extends State<DashboardPage> {
 
   String locationMessage = "Fetching location...";
   @override
+  @override
   void initState() {
     super.initState();
     _loadData();
-    _fetchLocation();
+    _initializeLocation(); // Call to update the submit button state
   }
 
-  Future<void> _fetchLocation() async {
-    final locationData = await LocationUtil.getCurrentLocation();
-    if (!mounted) return; // Check if the widget is still mounted
+  void _initializeLocation() async {
+    Position position = await Geolocator.getCurrentPosition(
+        // ignore: deprecated_member_use
+        desiredAccuracy: LocationAccuracy.high);
+    _currentLat = position.latitude;
+    _currentLon = position.longitude;
 
-    if (locationData != null) {
-      setState(() {
-        locationMessage =
-            "Lat: ${locationData.latitude}, Lon: ${locationData.longitude}";
-      });
-    } else {
-      setState(() {
-        locationMessage = "Failed to get location";
-      });
-    }
+    setState(() {
+      LatLng currentLocation = LatLng(_currentLat, _currentLon);
+      LatLng lastPlotLocation = _selectedEstatePlots.isNotEmpty
+          ? LatLng(_selectedEstatePlots.last.lat, _selectedEstatePlots.last.lon)
+          : const LatLng(0, 0); // Default location if no plot is selected
+
+      double distanceInKm =
+          calculateDistance(currentLocation, lastPlotLocation);
+      _isSubmitButtonEnabled =
+          distanceInKm <= 1.0; // Disable button if more than 1 km
+    });
   }
 
   Future<void> _loadData() async {
@@ -271,8 +279,16 @@ class _DashboardPageState extends State<DashboardPage> {
                   lon: plot['lon'],
                 ))
             .toList();
+
+        // Recheck location distance after selecting a new estate
+        _initializeLocation();
       }
     });
+  }
+
+  double calculateDistance(LatLng start, LatLng end) {
+    const Distance distance = Distance();
+    return distance.as(LengthUnit.Kilometer, start, end);
   }
 
   void _onSubmit() async {
@@ -339,11 +355,12 @@ class _DashboardPageState extends State<DashboardPage> {
     }
   }
 
+  final MapController _mapController = MapController();
+
   @override
   Widget build(BuildContext context) {
     final int hour = DateTime.now().hour;
 
-    // Determine which Lottie animation to use based on the time
     String lottieFile;
     if (hour >= 6 && hour < 12) {
       // Morning
@@ -355,6 +372,14 @@ class _DashboardPageState extends State<DashboardPage> {
       // Night
       lottieFile = 'assets/animations/Night.json';
     }
+
+    LatLng currentLocation = LatLng(_currentLat, _currentLon);
+    LatLng lastPlotLocation = _selectedEstatePlots.isNotEmpty
+        ? LatLng(_selectedEstatePlots.last.lat, _selectedEstatePlots.last.lon)
+        : const LatLng(0, 0); // Default location if no plot is selected
+
+    double distanceInKm = calculateDistance(currentLocation, lastPlotLocation);
+
     return Scaffold(
       appBar: AppBar(
         title: Row(
@@ -590,9 +615,11 @@ class _DashboardPageState extends State<DashboardPage> {
                                     child: const Text('Reset Pilihan'),
                                   ),
                                   ElevatedButton(
-                                    onPressed: () async {
-                                      _onSubmit();
-                                    },
+                                    onPressed: _isSubmitButtonEnabled
+                                        ? () async {
+                                            _onSubmit();
+                                          }
+                                        : null, // Disable button if not enabled
                                     child: const Text('Kirim Data'),
                                   ),
                                 ],
@@ -603,47 +630,74 @@ class _DashboardPageState extends State<DashboardPage> {
                       ),
                     ),
                     const SizedBox(height: 20),
-                    Center(
-                      child: GestureDetector(
-                        onLongPress: () {
-                          Clipboard.setData(
-                                  ClipboardData(text: locationMessage))
-                              .then((_) {
-                            ScaffoldMessenger.of(context).showSnackBar(
-                              const SnackBar(
-                                  content: Text('Text copied to clipboard')),
-                            );
-                          });
-                        },
-                        child: Card(
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(15),
-                          ),
-                          elevation: 4,
-                          color: const Color.fromARGB(255, 255, 255, 255),
-                          child: Padding(
-                            padding: const EdgeInsets.all(16.0),
-                            child: Text(locationMessage),
+                    if (_selectedEstatePlots.isNotEmpty)
+                      Center(
+                        child: GestureDetector(
+                          onLongPress: () {
+                            Clipboard.setData(const ClipboardData(
+                                    text: 'Location copied'))
+                                .then((_) {
+                              // ignore: use_build_context_synchronously
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                const SnackBar(
+                                    content: Text('Text copied to clipboard')),
+                              );
+                            });
+                          },
+                          child: Card(
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(15),
+                            ),
+                            elevation: 4,
+                            color: const Color.fromARGB(255, 255, 255, 255),
+                            child: Padding(
+                              padding: const EdgeInsets.all(16.0),
+                              child: Text(
+                                  'Your current location is ${distanceInKm.toStringAsFixed(2)} km from the last selected plot.'),
+                            ),
                           ),
                         ),
                       ),
-                    ),
                     if (_selectedEstatePlots.isNotEmpty)
                       Card(
                         shape: RoundedRectangleBorder(
                           borderRadius: BorderRadius.circular(15),
                         ),
                         elevation: 4,
-                        margin: const EdgeInsets.all(16),
+                        color: const Color.fromARGB(255, 255, 255, 255),
                         child: Padding(
                           padding: const EdgeInsets.all(16.0),
-                          child: SingleChildScrollView(
-                            child: Text(
-                              _selectedEstatePlots.isNotEmpty
-                                  ? _selectedEstatePlots
-                                      .map((plot) => plot.toString())
-                                      .join('\n')
-                                  : 'No plots available',
+                          child: SizedBox(
+                            width: double.infinity,
+                            height: 300.0,
+                            child: FlutterMap(
+                              mapController: _mapController,
+                              options: MapOptions(
+                                initialCenter: LatLng(
+                                    _selectedEstatePlots.last.lat,
+                                    _selectedEstatePlots.last.lon),
+                                maxZoom: 20.0,
+                                minZoom: 10.0,
+                              ),
+                              children: [
+                                TileLayer(
+                                  urlTemplate:
+                                      "https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png",
+                                  subdomains: const ['a', 'b', 'c'],
+                                ),
+                                PolygonLayer(
+                                  polygons: [
+                                    Polygon(
+                                      points: _selectedEstatePlots.map((plot) {
+                                        return LatLng(plot.lat, plot.lon);
+                                      }).toList(),
+                                      color: Colors.blue,
+                                      // ignore: deprecated_member_use
+                                      isFilled: true,
+                                    ),
+                                  ],
+                                ),
+                              ],
                             ),
                           ),
                         ),

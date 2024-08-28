@@ -48,6 +48,8 @@ dependencies:
   location: ^6.0.2
   flutter_map: ^7.0.2
   latlong2: ^0.9.1
+  flutter_map_cancellable_tile_provider: ^3.0.0
+  geolocator: ^13.0.1
 
   
 dev_dependencies:

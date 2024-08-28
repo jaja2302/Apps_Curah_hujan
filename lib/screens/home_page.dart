@@ -592,29 +592,29 @@ class _DashboardPageState extends State<DashboardPage> {
               ),
             ),
             const SizedBox(height: 20),
-            ElevatedButton(
-              onPressed: () async {
-                SharedPreferences prefs = await SharedPreferences.getInstance();
-                await prefs.remove('hasSkipped'); // Clear the skip status
-                if (!context.mounted) {
-                  return; // Check if context is still mounted
-                }
-                Navigator.pushReplacement(
-                  context,
-                  MaterialPageRoute(
-                    builder: (context) => const IntroductionScreen(),
-                  ),
-                );
-              },
-              style: ElevatedButton.styleFrom(
-                padding:
-                    const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(10),
-                ),
-              ),
-              child: const Text('Kembali ke Halaman Utama'),
-            ),
+            // ElevatedButton(
+            //   onPressed: () async {
+            //     SharedPreferences prefs = await SharedPreferences.getInstance();
+            //     await prefs.remove('hasSkipped'); // Clear the skip status
+            //     if (!context.mounted) {
+            //       return; // Check if context is still mounted
+            //     }
+            //     Navigator.pushReplacement(
+            //       context,
+            //       MaterialPageRoute(
+            //         builder: (context) => const IntroductionScreen(),
+            //       ),
+            //     );
+            //   },
+            //   style: ElevatedButton.styleFrom(
+            //     padding:
+            //         const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+            //     shape: RoundedRectangleBorder(
+            //       borderRadius: BorderRadius.circular(10),
+            //     ),
+            //   ),
+            //   child: const Text('Kembali ke Halaman Utama'),
+            // ),
           ],
         ),
       ),

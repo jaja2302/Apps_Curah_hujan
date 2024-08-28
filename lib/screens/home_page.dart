@@ -12,6 +12,8 @@ import 'package:fluttertoast/fluttertoast.dart';
 import 'package:lottie/lottie.dart';
 import 'package:hive_flutter/hive_flutter.dart';
 import 'history.dart'; // Import your History model
+import '../utils/Location.dart'; // Adjust the import path as necessary
+import 'package:flutter/services.dart'; // Import for Clipboard
 
 void main() async {
   // Ensure that plugin services are initialized so that Hive can use them
@@ -151,10 +153,26 @@ class _DashboardPageState extends State<DashboardPage> {
   String? _selectedWilayah;
   String? _selectedEstate;
 
+  String locationMessage = "Fetching location...";
   @override
   void initState() {
     super.initState();
     _loadData();
+    _fetchLocation();
+  }
+
+  Future<void> _fetchLocation() async {
+    final locationData = await LocationUtil.getCurrentLocation();
+    if (locationData != null) {
+      setState(() {
+        locationMessage =
+            "Lat: ${locationData.latitude}, Lon: ${locationData.longitude}";
+      });
+    } else {
+      setState(() {
+        locationMessage = "Failed to get location";
+      });
+    }
   }
 
   Future<void> _loadData() async {
@@ -592,6 +610,31 @@ class _DashboardPageState extends State<DashboardPage> {
               ),
             ),
             const SizedBox(height: 20),
+            Center(
+              child: GestureDetector(
+                onLongPress: () {
+                  // Copy text to clipboard
+                  Clipboard.setData(ClipboardData(text: locationMessage))
+                      .then((_) {
+                    // Optional: Show a snack bar or dialog to indicate success
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(content: Text('Text copied to clipboard')),
+                    );
+                  });
+                },
+                child: Card(
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(15),
+                  ),
+                  elevation: 4,
+                  color: const Color.fromARGB(255, 255, 255, 255),
+                  child: Padding(
+                    padding: const EdgeInsets.all(16.0),
+                    child: Text(locationMessage),
+                  ),
+                ),
+              ),
+            )
             // ElevatedButton(
             //   onPressed: () async {
             //     SharedPreferences prefs = await SharedPreferences.getInstance();

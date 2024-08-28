@@ -1,3 +1,5 @@
+// settings.gradle
+
 pluginManagement {
     def flutterSdkPath = {
         def properties = new Properties()
@@ -16,10 +18,23 @@ pluginManagement {
     }
 }
 
+// Ensure the buildscript block is placed before plugins block
+buildscript {
+    ext.kotlin_version = '1.9.0'  // Update to the latest version
+    repositories {
+        google()
+        mavenCentral()
+    }
+    dependencies {
+        classpath "org.jetbrains.kotlin:kotlin-gradle-plugin:$kotlin_version"
+        // other dependencies
+    }
+}
+
 plugins {
     id "dev.flutter.flutter-plugin-loader" version "1.0.0"
     id "com.android.application" version "7.3.0" apply false
-    id "org.jetbrains.kotlin.android" version "1.7.10" apply false
+    id "org.jetbrains.kotlin.android" version "1.9.0" apply false
 }
 
 include ":app"

@@ -46,6 +46,10 @@ dependencies:
   path_provider: ^2.1.0
   hive_flutter: ^1.1.0
   location: ^6.0.2
+  flutter_map: ^7.0.2
+  latlong2: ^0.9.1
+
+  
 dev_dependencies:
   flutter_test:
     sdk: flutter

@@ -48,4 +48,9 @@ class EstatePlot extends HiveObject {
     required this.lat,
     required this.lon,
   });
+
+  @override
+  String toString() {
+    return 'ID: $id, EST: $est, Lat: $lat, Lon: $lon';
+  }
 }

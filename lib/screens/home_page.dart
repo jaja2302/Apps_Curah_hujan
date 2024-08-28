@@ -355,8 +355,6 @@ class _DashboardPageState extends State<DashboardPage> {
     }
   }
 
-  final MapController _mapController = MapController();
-
   @override
   Widget build(BuildContext context) {
     final int hour = DateTime.now().hour;
@@ -379,6 +377,7 @@ class _DashboardPageState extends State<DashboardPage> {
         : const LatLng(0, 0); // Default location if no plot is selected
 
     double distanceInKm = calculateDistance(currentLocation, lastPlotLocation);
+    final MapController mapController = MapController();
 
     return Scaffold(
       appBar: AppBar(
@@ -653,7 +652,15 @@ class _DashboardPageState extends State<DashboardPage> {
                             child: Padding(
                               padding: const EdgeInsets.all(16.0),
                               child: Text(
-                                  'Your current location is ${distanceInKm.toStringAsFixed(2)} km from the last selected plot.'),
+                                distanceInKm > 1
+                                    ? 'Lokasi anda terlalu jauh dengan lokasi aktual ${distanceInKm.toStringAsFixed(2)} Km'
+                                    : 'Lokasi anda berada tepat dengan lokasi aktual ${distanceInKm.toStringAsFixed(2)} Km',
+                                style: TextStyle(
+                                  color: distanceInKm > 1
+                                      ? Colors.red
+                                      : Colors.green,
+                                ),
+                              ),
                             ),
                           ),
                         ),
@@ -671,7 +678,7 @@ class _DashboardPageState extends State<DashboardPage> {
                             width: double.infinity,
                             height: 300.0,
                             child: FlutterMap(
-                              mapController: _mapController,
+                              mapController: mapController,
                               options: MapOptions(
                                 initialCenter: LatLng(
                                     _selectedEstatePlots.last.lat,

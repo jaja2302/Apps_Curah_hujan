@@ -161,7 +161,6 @@ class _DashboardPageState extends State<DashboardPage> {
 
   String locationMessage = "Fetching location...";
   @override
-  @override
   void initState() {
     super.initState();
     _loadData();
@@ -188,6 +187,7 @@ class _DashboardPageState extends State<DashboardPage> {
   void _initializeLocation() async {
     try {
       Position position = await Geolocator.getCurrentPosition(
+          // ignore: deprecated_member_use
           desiredAccuracy: LocationAccuracy.high);
       _currentLat = position.latitude;
       _currentLon = position.longitude;
@@ -206,7 +206,9 @@ class _DashboardPageState extends State<DashboardPage> {
       });
     } catch (e) {
       // Handle location fetching error (e.g., user turned off location services)
-      print("Failed to get location: $e");
+      if (kDebugMode) {
+        print("Failed to get location: $e");
+      }
     }
   }
 
@@ -215,12 +217,12 @@ class _DashboardPageState extends State<DashboardPage> {
       context: context,
       builder: (BuildContext context) {
         return AlertDialog(
-          title: Text('Location Permission Required'),
-          content: Text(
+          title: const Text('Location Permission Required'),
+          content: const Text(
               'This app requires location access to function properly. Please grant location permission in your device settings.'),
           actions: [
             TextButton(
-              child: Text('OK'),
+              child: const Text('OK'),
               onPressed: () {
                 Navigator.of(context).pop();
               },
@@ -236,7 +238,7 @@ class _DashboardPageState extends State<DashboardPage> {
       context: context,
       builder: (BuildContext context) {
         return AlertDialog(
-          title: Text('Location Permission Permanently Denied'),
+          title: const Text('Location Permission Permanently Denied'),
           content: const Text(
               'Location access has been permanently denied. Please enable location permission manually in your device settings.'),
           actions: [
@@ -248,7 +250,7 @@ class _DashboardPageState extends State<DashboardPage> {
               },
             ),
             TextButton(
-              child: Text('Cancel'),
+              child: const Text('Cancel'),
               onPressed: () {
                 Navigator.of(context).pop();
               },
@@ -429,23 +431,20 @@ class _DashboardPageState extends State<DashboardPage> {
   @override
   Widget build(BuildContext context) {
     final int hour = DateTime.now().hour;
-
     String lottieFile;
+
     if (hour >= 6 && hour < 12) {
-      // Morning
       lottieFile = 'assets/animations/Animation - 1724746871822.json';
     } else if (hour >= 12 && hour < 18) {
-      // Afternoon
       lottieFile = 'assets/animations/Animation - 1724744924585.json';
     } else {
-      // Night
       lottieFile = 'assets/animations/Night.json';
     }
 
     LatLng currentLocation = LatLng(_currentLat, _currentLon);
     LatLng lastPlotLocation = _selectedEstatePlots.isNotEmpty
         ? LatLng(_selectedEstatePlots.last.lat, _selectedEstatePlots.last.lon)
-        : const LatLng(0, 0); // Default location if no plot is selected
+        : const LatLng(0, 0);
 
     double distanceInKm = calculateDistance(currentLocation, lastPlotLocation);
     final MapController mapController = MapController();
@@ -462,7 +461,7 @@ class _DashboardPageState extends State<DashboardPage> {
             const SizedBox(width: 10),
             const Text(
               'Dashboard',
-              style: TextStyle(fontSize: 16.0),
+              style: TextStyle(fontSize: 18.0, fontWeight: FontWeight.bold),
             ),
           ],
         ),
@@ -471,6 +470,38 @@ class _DashboardPageState extends State<DashboardPage> {
         padding: const EdgeInsets.all(16.0),
         child: Column(
           children: [
+            Card(
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(15),
+              ),
+              elevation: 4,
+              color: const Color.fromARGB(255, 0, 34, 102),
+              child: Padding(
+                padding: const EdgeInsets.all(20.0),
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  crossAxisAlignment: CrossAxisAlignment.center,
+                  children: [
+                    Expanded(
+                      child: Text(
+                        'Masukkan Data Aktual Sesuai dengan Data yang Ada di Lapangan',
+                        style: TextStyle(
+                          fontSize: 12.0,
+                          color: Colors.white.withOpacity(0.9),
+                        ),
+                        textAlign: TextAlign.left,
+                      ),
+                    ),
+                    Lottie.asset(
+                      lottieFile,
+                      height: 60,
+                      width: 60,
+                    ),
+                  ],
+                ),
+              ),
+            ),
+            const SizedBox(height: 20),
             Expanded(
               child: SingleChildScrollView(
                 child: Column(
@@ -480,41 +511,6 @@ class _DashboardPageState extends State<DashboardPage> {
                         borderRadius: BorderRadius.circular(15),
                       ),
                       elevation: 4,
-                      color: const Color.fromARGB(255, 0, 34, 102),
-                      child: Padding(
-                        padding: const EdgeInsets.all(16.0),
-                        child: Row(
-                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                          crossAxisAlignment: CrossAxisAlignment.center,
-                          children: [
-                            const Expanded(
-                              child: Center(
-                                child: Text(
-                                  'Masukkan Data Aktual Sesuai dengan Data yang Ada di Lapangan',
-                                  style: TextStyle(
-                                    fontSize: 10.0,
-                                    color: Colors.white,
-                                  ),
-                                  textAlign: TextAlign.left,
-                                ),
-                              ),
-                            ),
-                            Lottie.asset(
-                              lottieFile,
-                              height: 60,
-                              width: 60,
-                            ),
-                          ],
-                        ),
-                      ),
-                    ),
-                    const SizedBox(height: 20),
-                    Card(
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(15),
-                      ),
-                      elevation: 4,
-                      color: const Color.fromARGB(255, 255, 255, 255),
                       child: Padding(
                         padding: const EdgeInsets.all(16.0),
                         child: FormBuilder(
@@ -522,7 +518,6 @@ class _DashboardPageState extends State<DashboardPage> {
                           child: Column(
                             mainAxisSize: MainAxisSize.min,
                             children: [
-                              // FormBuilderDropdowns, TextFields, etc.
                               Row(
                                 children: [
                                   Expanded(
@@ -532,7 +527,7 @@ class _DashboardPageState extends State<DashboardPage> {
                                         labelText: 'Pilih Regional',
                                         border: OutlineInputBorder(
                                           borderRadius:
-                                              BorderRadius.circular(5),
+                                              BorderRadius.circular(10),
                                         ),
                                         contentPadding:
                                             const EdgeInsets.symmetric(
@@ -645,52 +640,51 @@ class _DashboardPageState extends State<DashboardPage> {
                                 ],
                               ),
                               const SizedBox(height: 20),
-                              SizedBox(
-                                width: double.infinity,
-                                child: FormBuilderTextField(
-                                  name: 'value_curah_hujan',
-                                  decoration: InputDecoration(
-                                    labelText: 'Curah Hujan Data',
-                                    border: OutlineInputBorder(
-                                      borderRadius: BorderRadius.circular(10),
-                                    ),
-                                    contentPadding: const EdgeInsets.symmetric(
-                                        horizontal: 16, vertical: 8),
+                              FormBuilderTextField(
+                                name: 'value_curah_hujan',
+                                decoration: InputDecoration(
+                                  labelText: 'Curah Hujan Data',
+                                  border: OutlineInputBorder(
+                                    borderRadius: BorderRadius.circular(10),
                                   ),
-                                  keyboardType:
-                                      const TextInputType.numberWithOptions(
-                                          decimal: true),
-                                  validator: FormBuilderValidators.compose([
-                                    FormBuilderValidators.required(),
-                                    FormBuilderValidators.numeric(),
-                                    (value) {
-                                      final regex = RegExp(r'^\d*\.?\d*');
-                                      if (!regex.hasMatch(value ?? '')) {
-                                        return 'Please enter a valid decimal number';
-                                      }
-                                      return null;
-                                    },
-                                  ]),
+                                  contentPadding: const EdgeInsets.symmetric(
+                                      horizontal: 16, vertical: 8),
                                 ),
+                                keyboardType:
+                                    const TextInputType.numberWithOptions(
+                                        decimal: true),
+                                validator: FormBuilderValidators.compose([
+                                  FormBuilderValidators.required(),
+                                  FormBuilderValidators.numeric(),
+                                  (value) {
+                                    final regex = RegExp(r'^\d*\.?\d*');
+                                    if (!regex.hasMatch(value ?? '')) {
+                                      return 'Please enter a valid decimal number';
+                                    }
+                                    return null;
+                                  },
+                                ]),
                               ),
                               const SizedBox(height: 25),
                               Row(
                                 mainAxisAlignment:
                                     MainAxisAlignment.spaceBetween,
                                 children: [
-                                  ElevatedButton(
+                                  ElevatedButton.icon(
                                     onPressed: () async {
                                       _resetFormAndFetchData();
                                     },
-                                    child: const Text('Reset Pilihan'),
+                                    icon: const Icon(Icons.refresh),
+                                    label: const Text('Reset Pilihan'),
                                   ),
-                                  ElevatedButton(
+                                  ElevatedButton.icon(
                                     onPressed: _isSubmitButtonEnabled
                                         ? () async {
                                             _onSubmit();
                                           }
-                                        : null, // Disable button if not enabled
-                                    child: const Text('Kirim Data'),
+                                        : null,
+                                    icon: const Icon(Icons.send),
+                                    label: const Text('Kirim Data'),
                                   ),
                                 ],
                               ),
@@ -701,84 +695,88 @@ class _DashboardPageState extends State<DashboardPage> {
                     ),
                     const SizedBox(height: 20),
                     if (_selectedEstatePlots.isNotEmpty)
-                      Center(
-                        child: GestureDetector(
-                          onLongPress: () {
-                            Clipboard.setData(const ClipboardData(
-                                    text: 'Location copied'))
-                                .then((_) {
-                              // ignore: use_build_context_synchronously
-                              ScaffoldMessenger.of(context).showSnackBar(
-                                const SnackBar(
-                                    content: Text('Text copied to clipboard')),
-                              );
-                            });
-                          },
-                          child: Card(
-                            shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(15),
-                            ),
-                            elevation: 4,
-                            color: const Color.fromARGB(255, 255, 255, 255),
-                            child: Padding(
-                              padding: const EdgeInsets.all(16.0),
-                              child: Text(
-                                distanceInKm > 25
-                                    ? 'Lokasi anda terlalu jauh dengan lokasi aktual ${distanceInKm.toStringAsFixed(2)} Km'
-                                    : 'Lokasi anda berada tepat dengan lokasi aktual ${distanceInKm.toStringAsFixed(2)} Km',
-                                style: TextStyle(
-                                  color: distanceInKm > 25
-                                      ? Colors.red
-                                      : Colors.green,
+                      Column(
+                        children: [
+                          GestureDetector(
+                            onLongPress: () {
+                              Clipboard.setData(const ClipboardData(
+                                      text: 'Location copied'))
+                                  .then((_) {
+                                ScaffoldMessenger.of(context).showSnackBar(
+                                  const SnackBar(
+                                      content:
+                                          Text('Text copied to clipboard')),
+                                );
+                              });
+                            },
+                            child: Card(
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(15),
+                              ),
+                              elevation: 4,
+                              color: const Color.fromARGB(255, 255, 255, 255),
+                              child: Padding(
+                                padding: const EdgeInsets.all(16.0),
+                                child: Text(
+                                  distanceInKm > 25
+                                      ? 'Lokasi anda terlalu jauh dengan lokasi aktual ${distanceInKm.toStringAsFixed(2)} Km'
+                                      : 'Lokasi anda berada tepat dengan lokasi aktual ${distanceInKm.toStringAsFixed(2)} Km',
+                                  style: TextStyle(
+                                    color: distanceInKm > 25
+                                        ? Colors.red
+                                        : Colors.green,
+                                  ),
                                 ),
                               ),
                             ),
                           ),
-                        ),
-                      ),
-                    if (_selectedEstatePlots.isNotEmpty)
-                      Card(
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(15),
-                        ),
-                        elevation: 4,
-                        color: const Color.fromARGB(255, 255, 255, 255),
-                        child: Padding(
-                          padding: const EdgeInsets.all(16.0),
-                          child: SizedBox(
-                            width: double.infinity,
-                            height: 300.0,
-                            child: FlutterMap(
-                              mapController: mapController,
-                              options: MapOptions(
-                                initialCenter: LatLng(
-                                    _selectedEstatePlots.last.lat,
-                                    _selectedEstatePlots.last.lon),
-                                maxZoom: 20.0,
-                                minZoom: 10.0,
+                          const SizedBox(height: 20),
+                          if (_selectedEstatePlots.isNotEmpty)
+                            Card(
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(15),
                               ),
-                              children: [
-                                TileLayer(
-                                  urlTemplate:
-                                      "https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png",
-                                  subdomains: const ['a', 'b', 'c'],
-                                ),
-                                PolygonLayer(
-                                  polygons: [
-                                    Polygon(
-                                      points: _selectedEstatePlots.map((plot) {
-                                        return LatLng(plot.lat, plot.lon);
-                                      }).toList(),
-                                      color: Colors.blue,
-                                      // ignore: deprecated_member_use
-                                      isFilled: true,
+                              elevation: 4,
+                              color: const Color.fromARGB(255, 255, 255, 255),
+                              child: Padding(
+                                padding: const EdgeInsets.all(16.0),
+                                child: SizedBox(
+                                  width: double.infinity,
+                                  height: 300.0,
+                                  child: FlutterMap(
+                                    mapController: mapController,
+                                    options: MapOptions(
+                                      initialCenter: LatLng(
+                                          _selectedEstatePlots.last.lat,
+                                          _selectedEstatePlots.last.lon),
+                                      maxZoom: 20.0,
+                                      minZoom: 10.0,
                                     ),
-                                  ],
+                                    children: [
+                                      TileLayer(
+                                        urlTemplate:
+                                            "https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png",
+                                        subdomains: const ['a', 'b', 'c'],
+                                      ),
+                                      PolygonLayer(
+                                        polygons: [
+                                          Polygon(
+                                            points: _selectedEstatePlots
+                                                .map((plot) {
+                                              return LatLng(plot.lat, plot.lon);
+                                            }).toList(),
+                                            color: Colors.blue,
+                                            // ignore: deprecated_member_use
+                                            isFilled: true,
+                                          ),
+                                        ],
+                                      ),
+                                    ],
+                                  ),
                                 ),
-                              ],
+                              ),
                             ),
-                          ),
-                        ),
+                        ],
                       ),
                   ],
                 ),

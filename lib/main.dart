@@ -2,7 +2,7 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'screens/introduction_screen.dart'; // Import layar pengenalan
 import 'package:hive_flutter/hive_flutter.dart';
-import 'screens/history.dart'; // Import your History model
+import 'utils/models.dart'; // Import your History model
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();

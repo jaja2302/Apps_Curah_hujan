@@ -11,7 +11,7 @@ import 'package:http/http.dart' as http; // Import for http requests
 import 'package:fluttertoast/fluttertoast.dart';
 import 'package:lottie/lottie.dart';
 import 'package:hive_flutter/hive_flutter.dart';
-import 'history.dart'; // Import your History model
+import '../utils/models.dart'; // Import your History model
 import '../utils/Location.dart'; // Adjust the import path as necessary
 import 'package:flutter/services.dart'; // Import for Clipboard
 
@@ -163,6 +163,8 @@ class _DashboardPageState extends State<DashboardPage> {
 
   Future<void> _fetchLocation() async {
     final locationData = await LocationUtil.getCurrentLocation();
+    if (!mounted) return; // Check if the widget is still mounted
+
     if (locationData != null) {
       setState(() {
         locationMessage =

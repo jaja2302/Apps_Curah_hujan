@@ -165,27 +165,98 @@ class _DashboardPageState extends State<DashboardPage> {
   void initState() {
     super.initState();
     _loadData();
-    _initializeLocation(); // Call to update the submit button state
+    _checkLocationPermission();
+  }
+
+  Future<void> _checkLocationPermission() async {
+    LocationPermission permission = await Geolocator.checkPermission();
+    if (permission == LocationPermission.denied) {
+      permission = await Geolocator.requestPermission();
+    }
+
+    if (permission == LocationPermission.denied) {
+      // Show a dialog or a message to the user explaining the need for location access
+      _showPermissionDeniedMessage();
+    } else if (permission == LocationPermission.deniedForever) {
+      // Permissions are permanently denied, handle appropriately
+      _showPermissionPermanentlyDeniedMessage();
+    } else {
+      _initializeLocation();
+    }
   }
 
   void _initializeLocation() async {
-    Position position = await Geolocator.getCurrentPosition(
-        // ignore: deprecated_member_use
-        desiredAccuracy: LocationAccuracy.high);
-    _currentLat = position.latitude;
-    _currentLon = position.longitude;
+    try {
+      Position position = await Geolocator.getCurrentPosition(
+          desiredAccuracy: LocationAccuracy.high);
+      _currentLat = position.latitude;
+      _currentLon = position.longitude;
 
-    setState(() {
-      LatLng currentLocation = LatLng(_currentLat, _currentLon);
-      LatLng lastPlotLocation = _selectedEstatePlots.isNotEmpty
-          ? LatLng(_selectedEstatePlots.last.lat, _selectedEstatePlots.last.lon)
-          : const LatLng(0, 0); // Default location if no plot is selected
+      setState(() {
+        LatLng currentLocation = LatLng(_currentLat, _currentLon);
+        LatLng lastPlotLocation = _selectedEstatePlots.isNotEmpty
+            ? LatLng(
+                _selectedEstatePlots.last.lat, _selectedEstatePlots.last.lon)
+            : const LatLng(0, 0); // Default location if no plot is selected
 
-      double distanceInKm =
-          calculateDistance(currentLocation, lastPlotLocation);
-      _isSubmitButtonEnabled =
-          distanceInKm <= 1.0; // Disable button if more than 1 km
-    });
+        double distanceInKm =
+            calculateDistance(currentLocation, lastPlotLocation);
+        _isSubmitButtonEnabled =
+            distanceInKm <= 25.0; // Disable button if more than 1 km
+      });
+    } catch (e) {
+      // Handle location fetching error (e.g., user turned off location services)
+      print("Failed to get location: $e");
+    }
+  }
+
+  void _showPermissionDeniedMessage() {
+    showDialog(
+      context: context,
+      builder: (BuildContext context) {
+        return AlertDialog(
+          title: Text('Location Permission Required'),
+          content: Text(
+              'This app requires location access to function properly. Please grant location permission in your device settings.'),
+          actions: [
+            TextButton(
+              child: Text('OK'),
+              onPressed: () {
+                Navigator.of(context).pop();
+              },
+            ),
+          ],
+        );
+      },
+    );
+  }
+
+  void _showPermissionPermanentlyDeniedMessage() {
+    showDialog(
+      context: context,
+      builder: (BuildContext context) {
+        return AlertDialog(
+          title: Text('Location Permission Permanently Denied'),
+          content: const Text(
+              'Location access has been permanently denied. Please enable location permission manually in your device settings.'),
+          actions: [
+            TextButton(
+              child: const Text('Open Settings'),
+              onPressed: () {
+                Geolocator.openAppSettings();
+                Navigator.of(context).pop();
+              },
+            ),
+            TextButton(
+              child: Text('Cancel'),
+              onPressed: () {
+                Navigator.of(context).pop();
+              },
+            ),
+          ],
+        );
+      },
+    );
   }
 
   Future<void> _loadData() async {
@@ -652,11 +723,11 @@ class _DashboardPageState extends State<DashboardPage> {
                             child: Padding(
                               padding: const EdgeInsets.all(16.0),
                               child: Text(
-                                distanceInKm > 1
+                                distanceInKm > 25
                                     ? 'Lokasi anda terlalu jauh dengan lokasi aktual ${distanceInKm.toStringAsFixed(2)} Km'
                                     : 'Lokasi anda berada tepat dengan lokasi aktual ${distanceInKm.toStringAsFixed(2)} Km',
                                 style: TextStyle(
-                                  color: distanceInKm > 1
+                                  color: distanceInKm > 25
                                       ? Colors.red
                                       : Colors.green,
                                 ),

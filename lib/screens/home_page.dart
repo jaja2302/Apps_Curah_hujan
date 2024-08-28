@@ -146,7 +146,7 @@ class DashboardPage extends StatefulWidget {
 class _DashboardPageState extends State<DashboardPage> {
   final _formKey = GlobalKey<FormBuilderState>();
   List<EstatePlot> _selectedEstatePlots = [];
-  bool _isSubmitButtonEnabled = true;
+  bool _isSubmitButtonEnabled = false;
 
   List<dynamic> _regions = [];
   List<dynamic> _wilayahs = [];
@@ -683,8 +683,8 @@ class _DashboardPageState extends State<DashboardPage> {
                                             _onSubmit();
                                           }
                                         : null,
-                                    icon: const Icon(Icons.send),
                                     label: const Text('Kirim Data'),
+                                    icon: const Icon(Icons.send),
                                   ),
                                 ],
                               ),
@@ -702,6 +702,7 @@ class _DashboardPageState extends State<DashboardPage> {
                               Clipboard.setData(const ClipboardData(
                                       text: 'Location copied'))
                                   .then((_) {
+                                // ignore: use_build_context_synchronously
                                 ScaffoldMessenger.of(context).showSnackBar(
                                   const SnackBar(
                                       content:
@@ -747,16 +748,16 @@ class _DashboardPageState extends State<DashboardPage> {
                                     mapController: mapController,
                                     options: MapOptions(
                                       initialCenter: LatLng(
-                                          _selectedEstatePlots.last.lat,
-                                          _selectedEstatePlots.last.lon),
-                                      maxZoom: 20.0,
-                                      minZoom: 10.0,
+                                          _selectedEstatePlots.first.lat,
+                                          _selectedEstatePlots.first.lon),
+                                      initialZoom: 11.30,
                                     ),
                                     children: [
                                       TileLayer(
                                         urlTemplate:
                                             "https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png",
                                         subdomains: const ['a', 'b', 'c'],
+                                        maxNativeZoom: 19,
                                       ),
                                       PolygonLayer(
                                         polygons: [

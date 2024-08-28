@@ -1,4 +1,5 @@
 // import 'package:flutter/foundation.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'introduction_screen.dart'; // Adjust the import based on your file structure
@@ -633,20 +634,48 @@ class _HistoryPageState extends State<HistoryPage> {
   List<History> cachedData = [];
   List<History> filteredData = [];
   final TextEditingController _filterController = TextEditingController();
+  Box<History>? historyBox;
 
   @override
   void initState() {
     super.initState();
+    _initHiveBox();
     _loadData();
     _filterController.addListener(_filterData);
   }
 
+  Future<void> _initHiveBox() async {
+    try {
+      if (Hive.isBoxOpen('historyBox')) {
+        historyBox = Hive.box<History>('historyBox');
+      } else {
+        historyBox = await Hive.openBox<History>('historyBox');
+      }
+    } catch (e) {
+      if (kDebugMode) {
+        print('Error opening Hive box: $e');
+      }
+    }
+  }
+
   Future<void> _loadData() async {
-    await DataCache().loadSubmittedData();
-    setState(() {
-      cachedData = DataCache().getData();
-      filteredData = cachedData; // Initialize with all data
-    });
+    try {
+      await DataCache().loadSubmittedData();
+
+      final data = DataCache().getData();
+      setState(() {
+        cachedData = data;
+        filteredData = cachedData;
+      });
+    } catch (e) {
+      if (kDebugMode) {
+        print('Error loading data: $e');
+      }
+      setState(() {
+        cachedData = [];
+        filteredData = [];
+      });
+    }
   }
 
   void _filterData() {
@@ -658,13 +687,48 @@ class _HistoryPageState extends State<HistoryPage> {
     });
   }
 
+  Future<void> _deleteItem(int index) async {
+    if (historyBox != null) {
+      try {
+        // Find the actual index in the Hive box using the object reference
+        final historyToDelete = filteredData[index];
+        final int hiveIndex = cachedData.indexOf(historyToDelete);
+
+        if (hiveIndex != -1) {
+          // Ensure the item exists in the box
+          await historyBox!.deleteAt(hiveIndex); // Delete the item from Hive
+
+          setState(() {
+            cachedData.removeAt(hiveIndex); // Update cachedData first
+            filteredData =
+                List.from(cachedData); // Re-sync filteredData with cachedData
+          });
+
+          // Optionally, reload the data to ensure consistency
+          await _loadData();
+        } else {
+          debugPrint('Error: Item not found in Hive box.');
+        }
+      } catch (e) {
+        debugPrint('Error deleting item: $e');
+      }
+    }
+  }
+
   Future<void> _clearData() async {
-    var box = await Hive.openBox('historyBox'); // Open your Hive box
-    await box.clear(); // Clear all data in the box
-    setState(() {
-      cachedData.clear();
-      filteredData.clear();
-    });
+    if (historyBox != null) {
+      try {
+        await historyBox!.clear();
+        setState(() {
+          cachedData.clear();
+          filteredData.clear();
+        });
+      } catch (e) {
+        if (kDebugMode) {
+          print('Error clearing Hive box: $e');
+        }
+      }
+    }
   }
 
   @override
@@ -716,7 +780,7 @@ class _HistoryPageState extends State<HistoryPage> {
           return Card(
             margin: const EdgeInsets.symmetric(vertical: 8.0, horizontal: 16.0),
             child: SizedBox(
-              height: 100, // Set a fixed height for each card
+              height: 100,
               child: Row(
                 children: [
                   Expanded(
@@ -729,7 +793,7 @@ class _HistoryPageState extends State<HistoryPage> {
                     tooltip: 'Hapus History',
                     icon: const Icon(Icons.delete),
                     onPressed: () {
-                      // Add your deletion logic here if needed
+                      _deleteItem(index); // Delete the specific item
                     },
                   ),
                 ],
@@ -741,7 +805,7 @@ class _HistoryPageState extends State<HistoryPage> {
       floatingActionButton: FloatingActionButton(
         onPressed: _clearData,
         tooltip: 'Hapus Semua Data',
-        child: Icon(Icons.delete_forever),
+        child: const Icon(Icons.delete_forever),
       ),
     );
   }

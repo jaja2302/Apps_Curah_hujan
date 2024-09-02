@@ -19,6 +19,7 @@ import 'package:geolocator/geolocator.dart';
 import 'package:image_picker/image_picker.dart';
 import 'dart:io'; // For File class
 import 'package:http_parser/http_parser.dart';
+import 'dart:async';
 
 void main() async {
   // Ensure that plugin services are initialized so that Hive can use them
@@ -150,6 +151,7 @@ class DashboardPage extends StatefulWidget {
 }
 
 late MapController _mapController;
+late StreamSubscription<Position> _positionStreamSubscription;
 
 class _DashboardPageState extends State<DashboardPage>
     with TickerProviderStateMixin {
@@ -172,6 +174,34 @@ class _DashboardPageState extends State<DashboardPage>
     _loadData();
     _checkLocationPermission();
     _mapController = MapController();
+    _startLocationUpdates();
+  }
+
+  void _startLocationUpdates() {
+    const locationSettings = LocationSettings(
+      accuracy: LocationAccuracy.high,
+      distanceFilter: 10,
+    );
+    _positionStreamSubscription =
+        Geolocator.getPositionStream(locationSettings: locationSettings)
+            .listen((Position position) {
+      setState(() {
+        _currentLat = position.latitude;
+        _currentLon = position.longitude;
+        _updateDistanceToOmbro();
+      });
+    });
+  }
+
+  void _updateDistanceToOmbro() {
+    if (_selectedOmbrocoordinats.isNotEmpty) {
+      LatLng currentLocation = LatLng(_currentLat, _currentLon);
+      LatLng ombroLocation = LatLng(
+          _selectedOmbrocoordinats.last.lat, _selectedOmbrocoordinats.last.lon);
+      double distanceInMeters =
+          calculateDistance(currentLocation, ombroLocation);
+      _isSubmitButtonEnabled = distanceInMeters <= 25.0;
+    }
   }
 
   void animatedMapMove(LatLng destLocation, double destZoom) {
@@ -242,7 +272,7 @@ class _DashboardPageState extends State<DashboardPage>
         double distanceInKm =
             calculateDistance(currentLocation, lastPlotLocation);
         _isSubmitButtonEnabled =
-            distanceInKm <= 25.0; // Disable button if more than 1 km
+            distanceInKm <= 10.0; // Disable button if more than 1 km
       });
     } catch (e) {
       // Handle location fetching error (e.g., user turned off location services)
@@ -726,6 +756,12 @@ class _DashboardPageState extends State<DashboardPage>
   }
 
   @override
+  @override
+  void dispose() {
+    _positionStreamSubscription.cancel();
+    super.dispose();
+  }
+
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: _buildAppBar(),
@@ -898,13 +934,13 @@ class _DashboardPageState extends State<DashboardPage>
   }
 
   Widget _buildLocationInfoCard() {
-    double distanceInMeters = calculateDistance(
-      LatLng(_currentLat, _currentLon),
-      _selectedOmbrocoordinats.isNotEmpty
-          ? LatLng(_selectedOmbrocoordinats.last.lat,
-              _selectedOmbrocoordinats.last.lon)
-          : const LatLng(0, 0),
-    );
+    double distanceInMeters = _selectedOmbrocoordinats.isNotEmpty
+        ? calculateDistance(
+            LatLng(_currentLat, _currentLon),
+            LatLng(_selectedOmbrocoordinats.last.lat,
+                _selectedOmbrocoordinats.last.lon),
+          )
+        : 0.0;
 
     return GestureDetector(
       onLongPress: _copyLocationToClipboard,
@@ -915,11 +951,11 @@ class _DashboardPageState extends State<DashboardPage>
         child: Padding(
           padding: const EdgeInsets.all(16.0),
           child: Text(
-            distanceInMeters > 25 // Adjust threshold if necessary
+            distanceInMeters > 10
                 ? 'Lokasi anda terlalu jauh dengan lokasi aktual ${distanceInMeters.toStringAsFixed(2)} meter'
                 : 'Lokasi anda berada tepat dengan lokasi aktual ${distanceInMeters.toStringAsFixed(2)} meter',
             style: TextStyle(
-                color: distanceInMeters > 25 ? Colors.red : Colors.green),
+                color: distanceInMeters > 10 ? Colors.red : Colors.green),
           ),
         ),
       ),

@@ -9,7 +9,7 @@ import 'package:form_builder_validators/form_builder_validators.dart'; // Import
 import 'dart:convert'; // Import for jsonDecode
 import 'package:http/http.dart' as http; // Import for http requests
 import 'package:fluttertoast/fluttertoast.dart';
-import 'package:lottie/lottie.dart';
+import 'package:lottie/lottie.dart' as lottie;
 import 'package:hive_flutter/hive_flutter.dart';
 import '../utils/models.dart'; // Import your History model
 import 'package:flutter/services.dart'; // Import for Clipboard
@@ -146,6 +146,7 @@ class DashboardPage extends StatefulWidget {
 class _DashboardPageState extends State<DashboardPage> {
   final _formKey = GlobalKey<FormBuilderState>();
   List<EstatePlot> _selectedEstatePlots = [];
+  List<Ombrocoordinat> _selectedOmbrocoordinats = [];
   bool _isSubmitButtonEnabled = false;
 
   List<dynamic> _regions = [];
@@ -353,6 +354,21 @@ class _DashboardPageState extends State<DashboardPage> {
                 ))
             .toList();
 
+        // Extracting ombro_afdeling coordinates
+        _selectedOmbrocoordinats = (estate['afdelings'] as List<dynamic>? ?? [])
+            .expand((afdeling) =>
+                (afdeling['ombro_afdeling'] as List<dynamic>? ?? []))
+            .map((ombro) => Ombrocoordinat(
+                  id: ombro['id'],
+                  est: ombro['est'],
+                  afd: ombro['afd'],
+                  lat: ombro['lat'],
+                  lon: ombro['lon'],
+                  status: ombro['status'],
+                  images: ombro['images'],
+                ))
+            .toList();
+
         // Recheck location distance after selecting a new estate
         _initializeLocation();
       }
@@ -429,364 +445,295 @@ class _DashboardPageState extends State<DashboardPage> {
   }
 
   @override
+  @override
   Widget build(BuildContext context) {
-    final int hour = DateTime.now().hour;
-    String lottieFile;
-
-    if (hour >= 6 && hour < 12) {
-      lottieFile = 'assets/animations/Animation - 1724746871822.json';
-    } else if (hour >= 12 && hour < 18) {
-      lottieFile = 'assets/animations/Animation - 1724744924585.json';
-    } else {
-      lottieFile = 'assets/animations/Night.json';
-    }
-
-    LatLng currentLocation = LatLng(_currentLat, _currentLon);
-    LatLng lastPlotLocation = _selectedEstatePlots.isNotEmpty
-        ? LatLng(_selectedEstatePlots.last.lat, _selectedEstatePlots.last.lon)
-        : const LatLng(0, 0);
-
-    double distanceInKm = calculateDistance(currentLocation, lastPlotLocation);
-    final MapController mapController = MapController();
-
     return Scaffold(
-      appBar: AppBar(
-        title: Row(
-          children: [
-            Image.asset(
-              'assets/images/LOGO-SRS.png',
-              width: 40,
-              height: 40,
-            ),
-            const SizedBox(width: 10),
-            const Text(
-              'Dashboard',
-              style: TextStyle(fontSize: 18.0, fontWeight: FontWeight.bold),
-            ),
-          ],
-        ),
+      appBar: _buildAppBar(),
+      body: _buildBody(),
+    );
+  }
+
+  AppBar _buildAppBar() {
+    return AppBar(
+      title: Row(
+        children: [
+          Image.asset('assets/images/LOGO-SRS.png', width: 40, height: 40),
+          const SizedBox(width: 10),
+          const Text('Dashboard',
+              style: TextStyle(fontSize: 18.0, fontWeight: FontWeight.bold)),
+        ],
       ),
-      body: Padding(
-        padding: const EdgeInsets.all(16.0),
-        child: Column(
-          children: [
-            Card(
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(15),
-              ),
-              elevation: 4,
-              color: const Color.fromARGB(255, 0, 34, 102),
-              child: Padding(
-                padding: const EdgeInsets.all(20.0),
-                child: Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  crossAxisAlignment: CrossAxisAlignment.center,
-                  children: [
-                    Expanded(
-                      child: Text(
-                        'Masukkan Data Aktual Sesuai dengan Data yang Ada di Lapangan',
-                        style: TextStyle(
-                          fontSize: 12.0,
-                          color: Colors.white.withOpacity(0.9),
-                        ),
-                        textAlign: TextAlign.left,
-                      ),
-                    ),
-                    Lottie.asset(
-                      lottieFile,
-                      height: 60,
-                      width: 60,
-                    ),
-                  ],
-                ),
-              ),
-            ),
-            const SizedBox(height: 20),
-            Expanded(
-              child: SingleChildScrollView(
-                child: Column(
-                  children: [
-                    Card(
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(15),
-                      ),
-                      elevation: 4,
-                      child: Padding(
-                        padding: const EdgeInsets.all(16.0),
-                        child: FormBuilder(
-                          key: _formKey,
-                          child: Column(
-                            mainAxisSize: MainAxisSize.min,
-                            children: [
-                              Row(
-                                children: [
-                                  Expanded(
-                                    child: FormBuilderDropdown<String>(
-                                      name: 'select_region',
-                                      decoration: InputDecoration(
-                                        labelText: 'Pilih Regional',
-                                        border: OutlineInputBorder(
-                                          borderRadius:
-                                              BorderRadius.circular(10),
-                                        ),
-                                        contentPadding:
-                                            const EdgeInsets.symmetric(
-                                                horizontal: 16, vertical: 8),
-                                      ),
-                                      initialValue: _selectedRegion,
-                                      items: _regions
-                                          .map<DropdownMenuItem<String>>(
-                                              (region) {
-                                        return DropdownMenuItem<String>(
-                                          value: region['id'].toString(),
-                                          child: Text(region['nama']),
-                                        );
-                                      }).toList(),
-                                      onChanged: _onRegionChanged,
-                                      validator: FormBuilderValidators.compose(
-                                          [FormBuilderValidators.required()]),
-                                      menuMaxHeight: 200,
-                                    ),
-                                  ),
-                                  const SizedBox(width: 10),
-                                  Expanded(
-                                    child: FormBuilderDropdown<String>(
-                                      name: 'select_wilayah',
-                                      decoration: InputDecoration(
-                                        labelText: 'Pilih Wilayah',
-                                        border: OutlineInputBorder(
-                                          borderRadius:
-                                              BorderRadius.circular(10),
-                                        ),
-                                        contentPadding:
-                                            const EdgeInsets.symmetric(
-                                                horizontal: 16, vertical: 8),
-                                      ),
-                                      initialValue: _selectedWilayah,
-                                      items: _wilayahs
-                                          .map<DropdownMenuItem<String>>(
-                                              (wilayah) {
-                                        return DropdownMenuItem<String>(
-                                          value: wilayah['id'].toString(),
-                                          child: Text(wilayah['nama']),
-                                        );
-                                      }).toList(),
-                                      onChanged: _onWilayahChanged,
-                                      validator: FormBuilderValidators.compose(
-                                          [FormBuilderValidators.required()]),
-                                      menuMaxHeight: 200,
-                                    ),
-                                  ),
-                                ],
-                              ),
-                              const SizedBox(height: 20),
-                              Row(
-                                children: [
-                                  Expanded(
-                                    child: FormBuilderDropdown<String>(
-                                      name: 'select_estate',
-                                      decoration: InputDecoration(
-                                        labelText: 'Pilih Estate',
-                                        border: OutlineInputBorder(
-                                          borderRadius:
-                                              BorderRadius.circular(10),
-                                        ),
-                                        contentPadding:
-                                            const EdgeInsets.symmetric(
-                                                horizontal: 16, vertical: 8),
-                                      ),
-                                      initialValue: _selectedEstate,
-                                      items: _estates
-                                          .map<DropdownMenuItem<String>>(
-                                              (estate) {
-                                        return DropdownMenuItem<String>(
-                                          value: estate['id'].toString(),
-                                          child: Text(estate['nama']),
-                                        );
-                                      }).toList(),
-                                      onChanged: _onEstateChanged,
-                                      validator: FormBuilderValidators.compose(
-                                          [FormBuilderValidators.required()]),
-                                      menuMaxHeight: 200,
-                                    ),
-                                  ),
-                                  const SizedBox(width: 10),
-                                  Expanded(
-                                    child: FormBuilderDropdown<String>(
-                                      name: 'select_afdeling',
-                                      decoration: InputDecoration(
-                                        labelText: 'Pilih Afdeling',
-                                        border: OutlineInputBorder(
-                                          borderRadius:
-                                              BorderRadius.circular(10),
-                                        ),
-                                        contentPadding:
-                                            const EdgeInsets.symmetric(
-                                                horizontal: 16, vertical: 8),
-                                      ),
-                                      items: _afdelings
-                                          .map<DropdownMenuItem<String>>(
-                                              (afdeling) {
-                                        return DropdownMenuItem<String>(
-                                          value: afdeling['id'].toString(),
-                                          child: Text(afdeling['nama']),
-                                        );
-                                      }).toList(),
-                                      validator: FormBuilderValidators.compose(
-                                          [FormBuilderValidators.required()]),
-                                      menuMaxHeight: 200,
-                                    ),
-                                  ),
-                                ],
-                              ),
-                              const SizedBox(height: 20),
-                              FormBuilderTextField(
-                                name: 'value_curah_hujan',
-                                decoration: InputDecoration(
-                                  labelText: 'Curah Hujan Data',
-                                  border: OutlineInputBorder(
-                                    borderRadius: BorderRadius.circular(10),
-                                  ),
-                                  contentPadding: const EdgeInsets.symmetric(
-                                      horizontal: 16, vertical: 8),
-                                ),
-                                keyboardType:
-                                    const TextInputType.numberWithOptions(
-                                        decimal: true),
-                                validator: FormBuilderValidators.compose([
-                                  FormBuilderValidators.required(),
-                                  FormBuilderValidators.numeric(),
-                                  (value) {
-                                    final regex = RegExp(r'^\d*\.?\d*');
-                                    if (!regex.hasMatch(value ?? '')) {
-                                      return 'Please enter a valid decimal number';
-                                    }
-                                    return null;
-                                  },
-                                ]),
-                              ),
-                              const SizedBox(height: 25),
-                              Row(
-                                mainAxisAlignment:
-                                    MainAxisAlignment.spaceBetween,
-                                children: [
-                                  ElevatedButton.icon(
-                                    onPressed: () async {
-                                      _resetFormAndFetchData();
-                                    },
-                                    icon: const Icon(Icons.refresh),
-                                    label: const Text('Reset Pilihan'),
-                                  ),
-                                  ElevatedButton.icon(
-                                    onPressed: _isSubmitButtonEnabled
-                                        ? () async {
-                                            _onSubmit();
-                                          }
-                                        : null,
-                                    label: const Text('Kirim Data'),
-                                    icon: const Icon(Icons.send),
-                                  ),
-                                ],
-                              ),
-                            ],
-                          ),
-                        ),
-                      ),
-                    ),
+    );
+  }
+
+  Widget _buildBody() {
+    return Padding(
+      padding: const EdgeInsets.all(16.0),
+      child: Column(
+        children: [
+          _buildHeaderCard(),
+          const SizedBox(height: 20),
+          Expanded(
+            child: SingleChildScrollView(
+              child: Column(
+                children: [
+                  _buildFormCard(),
+                  const SizedBox(height: 20),
+                  if (_selectedEstatePlots.isNotEmpty) ...[
+                    _buildLocationInfoCard(),
                     const SizedBox(height: 20),
-                    if (_selectedEstatePlots.isNotEmpty)
-                      Column(
-                        children: [
-                          GestureDetector(
-                            onLongPress: () {
-                              Clipboard.setData(const ClipboardData(
-                                      text: 'Location copied'))
-                                  .then((_) {
-                                // ignore: use_build_context_synchronously
-                                ScaffoldMessenger.of(context).showSnackBar(
-                                  const SnackBar(
-                                      content:
-                                          Text('Text copied to clipboard')),
-                                );
-                              });
-                            },
-                            child: Card(
-                              shape: RoundedRectangleBorder(
-                                borderRadius: BorderRadius.circular(15),
-                              ),
-                              elevation: 4,
-                              color: const Color.fromARGB(255, 255, 255, 255),
-                              child: Padding(
-                                padding: const EdgeInsets.all(16.0),
-                                child: Text(
-                                  distanceInKm > 25
-                                      ? 'Lokasi anda terlalu jauh dengan lokasi aktual ${distanceInKm.toStringAsFixed(2)} Km'
-                                      : 'Lokasi anda berada tepat dengan lokasi aktual ${distanceInKm.toStringAsFixed(2)} Km',
-                                  style: TextStyle(
-                                    color: distanceInKm > 25
-                                        ? Colors.red
-                                        : Colors.green,
-                                  ),
-                                ),
-                              ),
-                            ),
-                          ),
-                          const SizedBox(height: 20),
-                          if (_selectedEstatePlots.isNotEmpty)
-                            Card(
-                              shape: RoundedRectangleBorder(
-                                borderRadius: BorderRadius.circular(15),
-                              ),
-                              elevation: 4,
-                              color: const Color.fromARGB(255, 255, 255, 255),
-                              child: Padding(
-                                padding: const EdgeInsets.all(16.0),
-                                child: SizedBox(
-                                  width: double.infinity,
-                                  height: 300.0,
-                                  child: FlutterMap(
-                                    mapController: mapController,
-                                    options: MapOptions(
-                                      initialCenter: LatLng(
-                                          _selectedEstatePlots.first.lat,
-                                          _selectedEstatePlots.first.lon),
-                                      initialZoom: 11.30,
-                                    ),
-                                    children: [
-                                      TileLayer(
-                                        urlTemplate:
-                                            "https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png",
-                                        subdomains: const ['a', 'b', 'c'],
-                                        maxNativeZoom: 19,
-                                      ),
-                                      PolygonLayer(
-                                        polygons: [
-                                          Polygon(
-                                            points: _selectedEstatePlots
-                                                .map((plot) {
-                                              return LatLng(plot.lat, plot.lon);
-                                            }).toList(),
-                                            color: Colors.blue,
-                                            // ignore: deprecated_member_use
-                                            isFilled: true,
-                                          ),
-                                        ],
-                                      ),
-                                    ],
-                                  ),
-                                ),
-                              ),
-                            ),
-                        ],
-                      ),
+                    _buildMapCard(),
                   ],
-                ),
+                ],
               ),
             ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildHeaderCard() {
+    final String lottieFile = _getLottieFileBasedOnTime();
+    return Card(
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(15)),
+      elevation: 4,
+      color: const Color.fromARGB(255, 0, 34, 102),
+      child: Padding(
+        padding: const EdgeInsets.all(20.0),
+        child: Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          crossAxisAlignment: CrossAxisAlignment.center,
+          children: [
+            Expanded(
+              child: Text(
+                'Masukkan Data Aktual Sesuai dengan Data yang Ada di Lapangan',
+                style: TextStyle(
+                    fontSize: 12.0, color: Colors.white.withOpacity(0.9)),
+                textAlign: TextAlign.left,
+              ),
+            ),
+            lottie.Lottie.asset(lottieFile, height: 60, width: 60),
           ],
         ),
       ),
     );
+  }
+
+  Widget _buildFormCard() {
+    return Card(
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(15)),
+      elevation: 4,
+      child: Padding(
+        padding: const EdgeInsets.all(16.0),
+        child: FormBuilder(
+          key: _formKey,
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              _buildDropdownRow('select_region', 'Pilih Regional', _regions,
+                  _onRegionChanged),
+              _buildDropdownRow('select_wilayah', 'Pilih Wilayah', _wilayahs,
+                  _onWilayahChanged),
+              _buildDropdownRow(
+                  'select_estate', 'Pilih Estate', _estates, _onEstateChanged),
+              _buildDropdownRow(
+                  'select_afdeling', 'Pilih Afdeling', _afdelings, null),
+              const SizedBox(height: 20),
+              _buildCurahHujanInput(),
+              const SizedBox(height: 25),
+              _buildFormButtons(),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildDropdownRow(String name, String label, List<dynamic> items,
+      Function(String?)? onChanged) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 20),
+      child: FormBuilderDropdown<String>(
+        name: name,
+        decoration: InputDecoration(
+          labelText: label,
+          border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
+          contentPadding:
+              const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+        ),
+        items: items.map<DropdownMenuItem<String>>((item) {
+          return DropdownMenuItem<String>(
+            value: item['id'].toString(),
+            child: Text(item['nama']),
+          );
+        }).toList(),
+        onChanged: onChanged,
+        validator:
+            FormBuilderValidators.compose([FormBuilderValidators.required()]),
+        menuMaxHeight: 200,
+      ),
+    );
+  }
+
+  Widget _buildCurahHujanInput() {
+    return FormBuilderTextField(
+      name: 'value_curah_hujan',
+      decoration: InputDecoration(
+        labelText: 'Curah Hujan Data',
+        border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
+        contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+      ),
+      keyboardType: const TextInputType.numberWithOptions(decimal: true),
+      validator: FormBuilderValidators.compose([
+        FormBuilderValidators.required(),
+        FormBuilderValidators.numeric(),
+        (value) {
+          final regex = RegExp(r'^\d*\.?\d*');
+          if (!regex.hasMatch(value ?? '')) {
+            return 'Please enter a valid decimal number';
+          }
+          return null;
+        },
+      ]),
+    );
+  }
+
+  Widget _buildFormButtons() {
+    return Row(
+      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+      children: [
+        ElevatedButton.icon(
+          onPressed: _resetFormAndFetchData,
+          icon: const Icon(Icons.refresh),
+          label: const Text('Reset Pilihan'),
+        ),
+        ElevatedButton.icon(
+          onPressed: _isSubmitButtonEnabled ? _onSubmit : null,
+          icon: const Icon(Icons.send),
+          label: const Text('Kirim Data'),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildLocationInfoCard() {
+    double distanceInKm = calculateDistance(
+      LatLng(_currentLat, _currentLon),
+      _selectedEstatePlots.isNotEmpty
+          ? LatLng(_selectedEstatePlots.last.lat, _selectedEstatePlots.last.lon)
+          : const LatLng(0, 0),
+    );
+
+    return GestureDetector(
+      onLongPress: _copyLocationToClipboard,
+      child: Card(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(15)),
+        elevation: 4,
+        color: Colors.white,
+        child: Padding(
+          padding: const EdgeInsets.all(16.0),
+          child: Text(
+            distanceInKm > 25
+                ? 'Lokasi anda terlalu jauh dengan lokasi aktual ${distanceInKm.toStringAsFixed(2)} Km'
+                : 'Lokasi anda berada tepat dengan lokasi aktual ${distanceInKm.toStringAsFixed(2)} Km',
+            style:
+                TextStyle(color: distanceInKm > 25 ? Colors.red : Colors.green),
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildMapCard() {
+    return Card(
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(15)),
+      elevation: 4,
+      color: Colors.white,
+      child: Padding(
+        padding: const EdgeInsets.all(16.0),
+        child: SizedBox(
+          width: double.infinity,
+          height: 400.0,
+          child: FlutterMap(
+            mapController: MapController(),
+            options: MapOptions(
+              initialCenter: LatLng(_selectedEstatePlots.first.lat,
+                  _selectedEstatePlots.first.lon),
+              initialZoom: 11.30,
+              interactionOptions: const InteractionOptions(
+                flags: InteractiveFlag.all,
+                enableMultiFingerGestureRace: true,
+              ),
+              minZoom: 3,
+              maxZoom: 18,
+            ),
+            children: [
+              _buildTileLayer(),
+              _buildPolygonLayer(),
+              _buildMarkerLayer(),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  TileLayer _buildTileLayer() {
+    return TileLayer(
+      urlTemplate: "https://{s}.tile.openstreetmap.fr/hot/{z}/{x}/{y}.png",
+      subdomains: const ['a', 'b', 'c'],
+      maxZoom: 19,
+    );
+  }
+
+  PolygonLayer _buildPolygonLayer() {
+    return PolygonLayer(
+      polygons: [
+        Polygon(
+          points: _selectedEstatePlots
+              .map((plot) => LatLng(plot.lat, plot.lon))
+              .toList(),
+          color: Colors.blue.withOpacity(0.3),
+          borderColor: Colors.blue,
+          borderStrokeWidth: 2,
+          isFilled: true,
+        ),
+      ],
+    );
+  }
+
+  MarkerLayer _buildMarkerLayer() {
+    return MarkerLayer(
+      markers: _selectedOmbrocoordinats
+          .map((ombro) => Marker(
+                point: LatLng(ombro.lat, ombro.lon),
+                width: 30.0,
+                height: 30.0,
+                child: const Icon(Icons.location_on,
+                    color: Colors.red, size: 30.0),
+              ))
+          .toList(),
+    );
+  }
+
+  String _getLottieFileBasedOnTime() {
+    final int hour = DateTime.now().hour;
+    if (hour >= 6 && hour < 12) {
+      return 'assets/animations/Animation - 1724746871822.json';
+    } else if (hour >= 12 && hour < 18) {
+      return 'assets/animations/Animation - 1724744924585.json';
+    } else {
+      return 'assets/animations/Night.json';
+    }
+  }
+
+  void _copyLocationToClipboard() {
+    Clipboard.setData(const ClipboardData(text: 'Location copied')).then((_) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Text copied to clipboard')),
+      );
+    });
   }
 }
 

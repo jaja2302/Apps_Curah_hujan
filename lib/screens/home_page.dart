@@ -16,6 +16,8 @@ import 'package:flutter/services.dart'; // Import for Clipboard
 import 'package:flutter_map/flutter_map.dart';
 import 'package:latlong2/latlong.dart';
 import 'package:geolocator/geolocator.dart';
+import 'package:image_picker/image_picker.dart';
+import 'dart:io'; // For File class
 
 void main() async {
   // Ensure that plugin services are initialized so that Hive can use them
@@ -374,9 +376,151 @@ class _DashboardPageState extends State<DashboardPage> {
                     ))
                 .toList();
 
-        // Recheck location distance after selecting a new afdeling
+        if (_selectedOmbrocoordinats.isEmpty) {
+          _showEmptyOmbroAlert();
+        }
+
         _initializeLocation();
       }
+    });
+  }
+
+  void _showEmptyOmbroAlert() {
+    showDialog(
+      context: context,
+      builder: (BuildContext context) {
+        return AlertDialog(
+          title: const Text('Empty Ombro Data'),
+          content: const Text(
+              'Ombro data for this afdeling is empty. Would you like to add new ombro coordinates?'),
+          actions: [
+            TextButton(
+              child: const Text('Cancel'),
+              onPressed: () {
+                Navigator.of(context).pop();
+              },
+            ),
+            TextButton(
+              child: const Text('Add'),
+              onPressed: () {
+                Navigator.of(context).pop();
+                _showAddOmbroForm();
+              },
+            ),
+          ],
+        );
+      },
+    );
+  }
+
+  void _showAddOmbroForm() {
+    showDialog(
+      context: context,
+      builder: (BuildContext context) {
+        final formKey = GlobalKey<FormState>();
+        String est = '';
+        String afd = '';
+        String base64Image = '';
+
+        return AlertDialog(
+          title: const Text('Add New Ombro Coordinates'),
+          content: Form(
+            key: formKey,
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                FormBuilderDropdown<String>(
+                  name: 'estate',
+                  decoration: const InputDecoration(labelText: 'Estate'),
+                  items: _estates
+                      .map((estate) => DropdownMenuItem(
+                            value: estate['id'].toString(),
+                            child: Text(estate['est']),
+                          ))
+                      .toList(),
+                  onChanged: (value) => est = value ?? '',
+                  validator: FormBuilderValidators.required(),
+                ),
+                FormBuilderDropdown<String>(
+                  name: 'afdeling',
+                  decoration: const InputDecoration(labelText: 'Afdeling'),
+                  items: _afdelings
+                      .map((afdeling) => DropdownMenuItem(
+                            value: afdeling['id'].toString(),
+                            child: Text(afdeling['nama']),
+                          ))
+                      .toList(),
+                  onChanged: (value) => afd = value ?? '',
+                  validator: FormBuilderValidators.required(),
+                ),
+                ElevatedButton(
+                  child: const Text('Upload Image'),
+                  onPressed: () async {
+                    final pickedFile = await ImagePicker()
+                        .pickImage(source: ImageSource.gallery);
+                    if (pickedFile != null) {
+                      final bytes = await pickedFile.readAsBytes();
+                      base64Image = base64Encode(bytes);
+                    }
+                  },
+                ),
+              ],
+            ),
+          ),
+          actions: [
+            TextButton(
+              child: const Text('Cancel'),
+              onPressed: () {
+                Navigator.of(context).pop();
+              },
+            ),
+            TextButton(
+              child: const Text('Save'),
+              onPressed: () {
+                if (formKey.currentState?.validate() ?? false) {
+                  formKey.currentState?.save();
+                  _saveNewOmbroData(
+                      est, afd, _currentLat, _currentLon, base64Image);
+                  Navigator.of(context).pop();
+                }
+              },
+            ),
+          ],
+        );
+      },
+    );
+  }
+
+  void _saveNewOmbroData(
+      String estId, String afdId, double lat, double lon, String base64Image) {
+    // Implement the API call to save the new ombro data
+    http.post(
+      Uri.parse(
+          'https://management.srs-ssms.com/api/input_data_newombro_location'),
+      body: {
+        'est_id': estId,
+        'afd_id': afdId,
+        'email': 'j',
+        'password': 'j',
+        'lat': lat.toString(),
+        'lon': lon.toString(),
+        'image': base64Image,
+      },
+    ).then((response) {
+      if (response.statusCode == 200) {
+        // Handle successful response
+        Fluttertoast.showToast(msg: "New ombro location added successfully");
+        // Update the _selectedOmbrocoordinats list and refresh the UI
+        setState(() {
+          // Add the new ombro location to the list
+        });
+      } else {
+        // Handle error response
+        Fluttertoast.showToast(msg: "Failed to add new ombro location");
+      }
+    }).catchError((error) {
+      // Handle any errors that occur during the API call
+      Fluttertoast.showToast(msg: "Error: $error");
     });
   }
 

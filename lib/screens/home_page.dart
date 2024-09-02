@@ -344,22 +344,37 @@ class _DashboardPageState extends State<DashboardPage> {
                 ))
             .toList();
 
-        // Extracting ombro_afdeling coordinates
-        _selectedOmbrocoordinats = (estate['afdelings'] as List<dynamic>? ?? [])
-            .expand((afdeling) =>
-                (afdeling['ombro_afdeling'] as List<dynamic>? ?? []))
-            .map((ombro) => Ombrocoordinat(
-                  id: ombro['id'],
-                  est: ombro['est'],
-                  afd: ombro['afd'],
-                  lat: ombro['lat'],
-                  lon: ombro['lon'],
-                  status: ombro['status'],
-                  images: ombro['images'],
-                ))
-            .toList();
+        // Clear previously selected ombro coordinates
+        _selectedOmbrocoordinats = [];
 
         // Recheck location distance after selecting a new estate
+        _initializeLocation();
+      }
+    });
+  }
+
+  void _onAfdelingChanged(String? value) {
+    setState(() {
+      if (_afdelings.isNotEmpty) {
+        final afdeling = _afdelings.firstWhere(
+          (afdeling) => afdeling['id'].toString() == value,
+          orElse: () => {'ombro_afdeling': []},
+        );
+
+        _selectedOmbrocoordinats =
+            (afdeling['ombro_afdeling'] as List<dynamic>? ?? [])
+                .map((ombro) => Ombrocoordinat(
+                      id: ombro['id'],
+                      est: ombro['est'],
+                      afd: ombro['afd'],
+                      lat: ombro['lat'],
+                      lon: ombro['lon'],
+                      status: ombro['status'],
+                      images: ombro['images'],
+                    ))
+                .toList();
+
+        // Recheck location distance after selecting a new afdeling
         _initializeLocation();
       }
     });
@@ -526,8 +541,8 @@ class _DashboardPageState extends State<DashboardPage> {
                   _onWilayahChanged),
               _buildDropdownRow(
                   'select_estate', 'Pilih Estate', _estates, _onEstateChanged),
-              _buildDropdownRow(
-                  'select_afdeling', 'Pilih Afdeling', _afdelings, null),
+              _buildDropdownRow('select_afdeling', 'Pilih Afdeling', _afdelings,
+                  _onAfdelingChanged),
               const SizedBox(height: 20),
               _buildCurahHujanInput(),
               const SizedBox(height: 25),
@@ -609,7 +624,7 @@ class _DashboardPageState extends State<DashboardPage> {
   Widget _buildLocationInfoCard() {
     double distanceInMeters = calculateDistance(
       LatLng(_currentLat, _currentLon),
-      _selectedEstatePlots.isNotEmpty
+      _selectedOmbrocoordinats.isNotEmpty
           ? LatLng(_selectedOmbrocoordinats.last.lat,
               _selectedOmbrocoordinats.last.lon)
           : const LatLng(0, 0),
@@ -640,33 +655,58 @@ class _DashboardPageState extends State<DashboardPage> {
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(15)),
       elevation: 4,
       color: Colors.white,
-      child: SizedBox(
-        width: double.infinity,
-        height: 400.0,
-        child: FlutterMap(
-          mapController: MapController(),
-          options: MapOptions(
-            initialCenter: LatLng(_currentLat, _currentLon),
-            initialZoom: 14.00,
-            minZoom: 3,
-            maxZoom: 18,
-            interactionOptions: const InteractionOptions(
-              flags: InteractiveFlag.all,
-              enableMultiFingerGestureRace: true,
-              rotationThreshold: 15.0,
-              pinchZoomThreshold: 0.3,
-              pinchMoveThreshold: 30.0,
-              scrollWheelVelocity: 0.005,
+      child: Column(
+        children: [
+          SizedBox(
+            width: double.infinity,
+            height: 400.0,
+            child: FlutterMap(
+              mapController: MapController(),
+              options: MapOptions(
+                initialCenter: LatLng(_currentLat, _currentLon),
+                initialZoom: 14.00,
+                minZoom: 3,
+                maxZoom: 18,
+                interactionOptions: const InteractionOptions(
+                  flags: InteractiveFlag.all,
+                  enableMultiFingerGestureRace: true,
+                  rotationThreshold: 15.0,
+                  pinchZoomThreshold: 0.3,
+                  pinchMoveThreshold: 30.0,
+                  scrollWheelVelocity: 0.005,
+                ),
+              ),
+              children: [
+                _buildTileLayer(),
+                _buildPolygonLayer(),
+                _buildMarkerLayer(),
+                _buildMarkercurrentLocation(),
+              ],
             ),
           ),
-          children: [
-            _buildTileLayer(),
-            _buildPolygonLayer(),
-            _buildMarkerLayer(),
-            _buildMarkercurrentLocation(),
-          ],
-        ),
+          Padding(
+            padding: const EdgeInsets.all(8.0),
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                _buildLegendItem(Colors.red, 'User Location'),
+                const SizedBox(width: 20),
+                _buildLegendItem(Colors.blue, 'Ombro Location'),
+              ],
+            ),
+          ),
+        ],
       ),
+    );
+  }
+
+  Widget _buildLegendItem(Color color, String label) {
+    return Row(
+      children: [
+        Icon(Icons.location_on, color: color, size: 20),
+        const SizedBox(width: 4),
+        Text(label, style: TextStyle(fontSize: 12)),
+      ],
     );
   }
 
@@ -701,10 +741,48 @@ class _DashboardPageState extends State<DashboardPage> {
                 point: LatLng(ombro.lat, ombro.lon),
                 width: 30.0,
                 height: 30.0,
-                child: const Icon(Icons.location_on,
-                    color: Colors.red, size: 30.0),
+                child: GestureDetector(
+                  onTap: () {
+                    _showMarkerDetails(context, ombro);
+                  },
+                  child: const Icon(Icons.location_on,
+                      color: Colors.blue, size: 30.0), // Changed to blue
+                ),
               ))
           .toList(),
+    );
+  }
+
+  void _showMarkerDetails(BuildContext context, Ombrocoordinat ombro) {
+    showDialog(
+      context: context,
+      builder: (BuildContext context) {
+        return AlertDialog(
+          title: const Text('Marker Ombro Lokasi'),
+          content: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            mainAxisSize: MainAxisSize.min,
+            children: <Widget>[
+              Container(
+                width: double.infinity, // Make the container take full width
+                height: 200.0, // Set a fixed height for the image
+                child: Image.network(
+                  'https://mobilepro.srs-ssms.com/storage/app/public/qc/grading_mill/${ombro.images}',
+                  fit: BoxFit.cover, // Ensure the image covers the container
+                ),
+              ),
+            ],
+          ),
+          actions: <Widget>[
+            TextButton(
+              child: const Text('Close'),
+              onPressed: () {
+                Navigator.of(context).pop();
+              },
+            ),
+          ],
+        );
+      },
     );
   }
 
@@ -715,10 +793,43 @@ class _DashboardPageState extends State<DashboardPage> {
           point: LatLng(_currentLat, _currentLon),
           width: 30.0,
           height: 30.0,
-          child: const Icon(Icons.location_on,
-              color: Color.fromARGB(255, 51, 204, 110), size: 30.0),
+          child: GestureDetector(
+            onTap: () {
+              _showCurrentLocationDetails(context);
+            },
+            child: const Icon(Icons.location_on,
+                color: Colors.red, size: 30.0), // Changed to red
+          ),
         ),
       ],
+    );
+  }
+
+  void _showCurrentLocationDetails(BuildContext context) {
+    showDialog(
+      context: context,
+      builder: (BuildContext context) {
+        return AlertDialog(
+          title: const Text('User Lokasi Sekarang'),
+          content: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            mainAxisSize: MainAxisSize.min,
+            children: <Widget>[
+              // Add any content you want to display about the current location
+              Text('Latitude: $_currentLat'),
+              Text('Longitude: $_currentLon'),
+            ],
+          ),
+          actions: <Widget>[
+            TextButton(
+              child: const Text('Close'),
+              onPressed: () {
+                Navigator.of(context).pop();
+              },
+            ),
+          ],
+        );
+      },
     );
   }
 

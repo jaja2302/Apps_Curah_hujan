@@ -92,6 +92,9 @@ class DataCache {
   Box<History>? _historyBox;
 
   List<dynamic> get regions => _regions;
+  void clearCache() {
+    _regions = [];
+  }
 
   Future<void> fetchData() async {
     if (_regions.isEmpty) {
@@ -262,6 +265,8 @@ class _DashboardPageState extends State<DashboardPage> {
   }
 
   Future<void> _loadData() async {
+    // Clear the cache before fetching new data
+    DataCache().clearCache();
     await DataCache().fetchData();
     setState(() {
       _regions = DataCache().regions;
@@ -272,24 +277,32 @@ class _DashboardPageState extends State<DashboardPage> {
   }
 
   void _resetFormAndFetchData() async {
-    setState(() {
-      _formKey.currentState?.fields.forEach((key, field) {
-        field.reset();
-      });
+    _formKey.currentState?.reset();
 
+    setState(() {
+      _regions = [];
       _wilayahs = [];
       _estates = [];
       _afdelings = [];
+      _selectedEstatePlots = [];
+      _selectedOmbrocoordinats = [];
     });
 
     await _loadData();
 
     setState(() {
+      // Explicitly set all dropdown values to null
       _formKey.currentState?.fields['select_region']?.didChange(null);
       _formKey.currentState?.fields['select_wilayah']?.didChange(null);
       _formKey.currentState?.fields['select_estate']?.didChange(null);
       _formKey.currentState?.fields['select_afdeling']?.didChange(null);
+
+      // Force rebuild of the regional dropdown
+      _formKey.currentState?.fields['select_region']?.reset();
     });
+
+    // Trigger a rebuild of the form
+    _formKey.currentState?.save();
   }
 
   void _onRegionChanged(String? value) {
@@ -567,6 +580,21 @@ class _DashboardPageState extends State<DashboardPage> {
 
       if (response.statusCode == 200) {
         Fluttertoast.showToast(msg: "New ombro location added successfully");
+        // Refresh the data after successful upload
+        await _loadData();
+        setState(() {
+          // Explicitly set all dropdown values to null
+          _formKey.currentState?.fields['select_region']?.didChange(null);
+          _formKey.currentState?.fields['select_wilayah']?.didChange(null);
+          _formKey.currentState?.fields['select_estate']?.didChange(null);
+          _formKey.currentState?.fields['select_afdeling']?.didChange(null);
+
+          // Force rebuild of the regional dropdown
+          _formKey.currentState?.fields['select_region']?.reset();
+        });
+
+        // Trigger a rebuild of the form
+        _formKey.currentState?.save();
       } else {
         // Handle error response
         if (kDebugMode) {

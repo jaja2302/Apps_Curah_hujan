@@ -18,6 +18,7 @@ import 'package:latlong2/latlong.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:image_picker/image_picker.dart';
 import 'dart:io'; // For File class
+import 'package:http_parser/http_parser.dart';
 
 void main() async {
   // Ensure that plugin services are initialized so that Hive can use them
@@ -421,107 +422,165 @@ class _DashboardPageState extends State<DashboardPage> {
         String est = '';
         String afd = '';
         String base64Image = '';
+        File? imageFile;
 
-        return AlertDialog(
-          title: const Text('Add New Ombro Coordinates'),
-          content: Form(
-            key: formKey,
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                FormBuilderDropdown<String>(
-                  name: 'estate',
-                  decoration: const InputDecoration(labelText: 'Estate'),
-                  items: _estates
-                      .map((estate) => DropdownMenuItem(
-                            value: estate['id'].toString(),
-                            child: Text(estate['est']),
-                          ))
-                      .toList(),
-                  onChanged: (value) => est = value ?? '',
-                  validator: FormBuilderValidators.required(),
+        return StatefulBuilder(
+          builder: (context, setState) {
+            return AlertDialog(
+              title: const Text('Add New Ombro Coordinates'),
+              content: Form(
+                key: formKey,
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    FormBuilderDropdown<String>(
+                      name: 'estate',
+                      decoration: const InputDecoration(labelText: 'Estate'),
+                      items: _estates
+                          .map((estate) => DropdownMenuItem(
+                                value: estate['id'].toString(),
+                                child: Text(estate['est']),
+                              ))
+                          .toList(),
+                      onChanged: (value) => est = value ?? '',
+                      validator: FormBuilderValidators.required(),
+                    ),
+                    FormBuilderDropdown<String>(
+                      name: 'afdeling',
+                      decoration: const InputDecoration(labelText: 'Afdeling'),
+                      items: _afdelings
+                          .map((afdeling) => DropdownMenuItem(
+                                value: afdeling['id'].toString(),
+                                child: Text(afdeling['nama']),
+                              ))
+                          .toList(),
+                      onChanged: (value) => afd = value ?? '',
+                      validator: FormBuilderValidators.required(),
+                    ),
+                    ElevatedButton(
+                      child: const Text('Take Photo'),
+                      onPressed: () async {
+                        final pickedFile = await ImagePicker().pickImage(
+                          source: ImageSource.camera,
+                          imageQuality: 100,
+                        );
+                        if (pickedFile != null) {
+                          setState(() {
+                            imageFile = File(pickedFile.path);
+                          });
+                          final bytes = await pickedFile.readAsBytes();
+                          base64Image = base64Encode(bytes);
+                        }
+                      },
+                    ),
+                    if (imageFile != null)
+                      GestureDetector(
+                        onTap: () {
+                          Navigator.of(context).push(
+                            MaterialPageRoute(
+                              builder: (context) => Scaffold(
+                                appBar: AppBar(
+                                  title: const Text('Full Image'),
+                                ),
+                                body: Center(
+                                  child: Image.file(imageFile!),
+                                ),
+                              ),
+                            ),
+                          );
+                        },
+                        child: Container(
+                          margin: const EdgeInsets.only(top: 10),
+                          height: 100,
+                          width: 100,
+                          decoration: BoxDecoration(
+                            image: DecorationImage(
+                              image: FileImage(imageFile!),
+                              fit: BoxFit.cover,
+                            ),
+                          ),
+                        ),
+                      ),
+                  ],
                 ),
-                FormBuilderDropdown<String>(
-                  name: 'afdeling',
-                  decoration: const InputDecoration(labelText: 'Afdeling'),
-                  items: _afdelings
-                      .map((afdeling) => DropdownMenuItem(
-                            value: afdeling['id'].toString(),
-                            child: Text(afdeling['nama']),
-                          ))
-                      .toList(),
-                  onChanged: (value) => afd = value ?? '',
-                  validator: FormBuilderValidators.required(),
+              ),
+              actions: [
+                TextButton(
+                  child: const Text('Cancel'),
+                  onPressed: () {
+                    Navigator.of(context).pop();
+                  },
                 ),
-                ElevatedButton(
-                  child: const Text('Upload Image'),
-                  onPressed: () async {
-                    final pickedFile = await ImagePicker()
-                        .pickImage(source: ImageSource.gallery);
-                    if (pickedFile != null) {
-                      final bytes = await pickedFile.readAsBytes();
-                      base64Image = base64Encode(bytes);
+                TextButton(
+                  child: const Text('Save'),
+                  onPressed: () {
+                    if (formKey.currentState?.validate() ?? false) {
+                      formKey.currentState?.save();
+                      _saveNewOmbroData(
+                          est, afd, _currentLat, _currentLon, base64Image);
+                      Navigator.of(context).pop();
                     }
                   },
                 ),
               ],
-            ),
-          ),
-          actions: [
-            TextButton(
-              child: const Text('Cancel'),
-              onPressed: () {
-                Navigator.of(context).pop();
-              },
-            ),
-            TextButton(
-              child: const Text('Save'),
-              onPressed: () {
-                if (formKey.currentState?.validate() ?? false) {
-                  formKey.currentState?.save();
-                  _saveNewOmbroData(
-                      est, afd, _currentLat, _currentLon, base64Image);
-                  Navigator.of(context).pop();
-                }
-              },
-            ),
-          ],
+            );
+          },
         );
       },
     );
   }
 
-  void _saveNewOmbroData(
-      String estId, String afdId, double lat, double lon, String base64Image) {
-    // Implement the API call to save the new ombro data
-    http.post(
-      Uri.parse(
-          'https://management.srs-ssms.com/api/input_data_newombro_location'),
-      body: {
-        'est_id': estId,
-        'afd_id': afdId,
-        'email': 'j',
-        'password': 'j',
-        'lat': lat.toString(),
-        'lon': lon.toString(),
-        'image': base64Image,
-      },
-    ).then((response) {
+  void _saveNewOmbroData(String estId, String afdId, double lat, double lon,
+      String base64Image) async {
+    try {
+      var request = http.MultipartRequest(
+        'POST',
+        Uri.parse(
+            'https://management.srs-ssms.com/api/input_data_newombro_location'),
+      );
+
+      // Adding the regular form fields
+      request.fields['est'] = estId;
+      request.fields['afd'] = afdId;
+      request.fields['email'] = 'j';
+      request.fields['password'] = 'j';
+      request.fields['lat'] = lat.toString();
+      request.fields['lon'] = lon.toString();
+
+      // Adding the image as a file field
+      request.files.add(
+        http.MultipartFile.fromString(
+          'image', // field name in the API
+          base64Image,
+          filename: 'upload.jpg',
+          contentType: MediaType('image', 'jpeg'),
+        ),
+      );
+
+      // Sending the request
+      var response = await request.send();
+
+      // Log response details
+      if (kDebugMode) {
+        print('Response status: ${response.statusCode}');
+      }
+
       if (response.statusCode == 200) {
-        // Handle successful response
         Fluttertoast.showToast(msg: "New ombro location added successfully");
-        // Update the _selectedOmbrocoordinats list and refresh the UI
-        setState(() {
-          // Add the new ombro location to the list
-        });
       } else {
         // Handle error response
+        if (kDebugMode) {
+          print('Response reason: ${response.reasonPhrase}');
+        }
         Fluttertoast.showToast(msg: "Failed to add new ombro location");
       }
-    }).catchError((error) {
+    } catch (error) {
       // Handle any errors that occur during the API call
+      if (kDebugMode) {
+        print('Error: $error');
+      }
       Fluttertoast.showToast(msg: "Error: $error");
-    });
+    }
   }
 
   double calculateDistance(LatLng start, LatLng end) {
@@ -849,7 +908,7 @@ class _DashboardPageState extends State<DashboardPage> {
       children: [
         Icon(Icons.location_on, color: color, size: 20),
         const SizedBox(width: 4),
-        Text(label, style: TextStyle(fontSize: 12)),
+        Text(label, style: const TextStyle(fontSize: 12)),
       ],
     );
   }
@@ -872,6 +931,7 @@ class _DashboardPageState extends State<DashboardPage> {
           color: Colors.blue.withOpacity(0.3),
           borderColor: Colors.blue,
           borderStrokeWidth: 2,
+          // ignore: deprecated_member_use
           isFilled: true,
         ),
       ],
@@ -907,7 +967,7 @@ class _DashboardPageState extends State<DashboardPage> {
             crossAxisAlignment: CrossAxisAlignment.start,
             mainAxisSize: MainAxisSize.min,
             children: <Widget>[
-              Container(
+              SizedBox(
                 width: double.infinity, // Make the container take full width
                 height: 200.0, // Set a fixed height for the image
                 child: Image.network(
@@ -990,6 +1050,7 @@ class _DashboardPageState extends State<DashboardPage> {
 
   void _copyLocationToClipboard() {
     Clipboard.setData(const ClipboardData(text: 'Location copied')).then((_) {
+      // ignore: use_build_context_synchronously
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Text copied to clipboard')),
       );

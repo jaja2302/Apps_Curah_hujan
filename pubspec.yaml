@@ -52,6 +52,7 @@ dependencies:
   geolocator: ^13.0.1
   connectivity_plus: ^6.0.5
   image_picker: ^1.1.2
+  http_parser: ^4.0.2
 
   
 dev_dependencies:

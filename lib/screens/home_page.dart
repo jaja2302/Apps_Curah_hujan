@@ -149,7 +149,10 @@ class DashboardPage extends StatefulWidget {
   _DashboardPageState createState() => _DashboardPageState();
 }
 
-class _DashboardPageState extends State<DashboardPage> {
+late MapController _mapController;
+
+class _DashboardPageState extends State<DashboardPage>
+    with TickerProviderStateMixin {
   final _formKey = GlobalKey<FormBuilderState>();
   List<EstatePlot> _selectedEstatePlots = [];
   List<Ombrocoordinat> _selectedOmbrocoordinats = [];
@@ -168,6 +171,40 @@ class _DashboardPageState extends State<DashboardPage> {
     super.initState();
     _loadData();
     _checkLocationPermission();
+    _mapController = MapController();
+  }
+
+  void animatedMapMove(LatLng destLocation, double destZoom) {
+    final latTween = Tween<double>(
+        begin: _mapController.camera.center.latitude,
+        end: destLocation.latitude);
+    final lngTween = Tween<double>(
+        begin: _mapController.camera.center.longitude,
+        end: destLocation.longitude);
+    final zoomTween =
+        Tween<double>(begin: _mapController.camera.zoom, end: destZoom);
+
+    var controller = AnimationController(
+        duration: const Duration(milliseconds: 1000), vsync: this);
+    Animation<double> animation =
+        CurvedAnimation(parent: controller, curve: Curves.fastOutSlowIn);
+
+    controller.addListener(() {
+      _mapController.move(
+        LatLng(latTween.evaluate(animation), lngTween.evaluate(animation)),
+        zoomTween.evaluate(animation),
+      );
+    });
+
+    animation.addStatusListener((status) {
+      if (status == AnimationStatus.completed) {
+        controller.dispose();
+      } else if (status == AnimationStatus.dismissed) {
+        controller.dispose();
+      }
+    });
+
+    controller.forward();
   }
 
   Future<void> _checkLocationPermission() async {
@@ -404,18 +441,18 @@ class _DashboardPageState extends State<DashboardPage> {
       context: context,
       builder: (BuildContext context) {
         return AlertDialog(
-          title: const Text('Empty Ombro Data'),
+          title: const Text('Ombro Data Kosong'),
           content: const Text(
-              'Ombro data for this afdeling is empty. Would you like to add new ombro coordinates?'),
+              'Tidak ada data ombro untuk afdeling ini. Silakan tambahkan data ombro terlebih dahulu.'),
           actions: [
             TextButton(
-              child: const Text('Cancel'),
+              child: const Text('Batal'),
               onPressed: () {
                 Navigator.of(context).pop();
               },
             ),
             TextButton(
-              child: const Text('Add'),
+              child: const Text('Tambah'),
               onPressed: () {
                 Navigator.of(context).pop();
                 _showAddOmbroForm();
@@ -440,7 +477,7 @@ class _DashboardPageState extends State<DashboardPage> {
         return StatefulBuilder(
           builder: (context, setState) {
             return AlertDialog(
-              title: const Text('Add New Ombro Coordinates'),
+              title: const Text('Tambah data ombro'),
               content: Form(
                 key: formKey,
                 child: Column(
@@ -546,6 +583,8 @@ class _DashboardPageState extends State<DashboardPage> {
   void _saveNewOmbroData(String estId, String afdId, double lat, double lon,
       String base64Image) async {
     try {
+      var imageData = base64Decode(base64Image);
+
       var request = http.MultipartRequest(
         'POST',
         Uri.parse(
@@ -562,9 +601,9 @@ class _DashboardPageState extends State<DashboardPage> {
 
       // Adding the image as a file field
       request.files.add(
-        http.MultipartFile.fromString(
+        http.MultipartFile.fromBytes(
           'image', // field name in the API
-          base64Image,
+          imageData,
           filename: 'upload.jpg',
           contentType: MediaType('image', 'jpeg'),
         ),
@@ -600,14 +639,20 @@ class _DashboardPageState extends State<DashboardPage> {
         if (kDebugMode) {
           print('Response reason: ${response.reasonPhrase}');
         }
-        Fluttertoast.showToast(msg: "Failed to add new ombro location");
+        Fluttertoast.showToast(
+          msg: "Failed to add new ombro location: ${response.reasonPhrase}",
+          toastLength: Toast.LENGTH_LONG,
+        );
       }
     } catch (error) {
       // Handle any errors that occur during the API call
       if (kDebugMode) {
         print('Error: $error');
       }
-      Fluttertoast.showToast(msg: "Error: $error");
+      Fluttertoast.showToast(
+        msg: "Error occurred: $error",
+        toastLength: Toast.LENGTH_LONG,
+      );
     }
   }
 
@@ -892,7 +937,7 @@ class _DashboardPageState extends State<DashboardPage> {
             width: double.infinity,
             height: 400.0,
             child: FlutterMap(
-              mapController: MapController(),
+              mapController: _mapController,
               options: MapOptions(
                 initialCenter: LatLng(_currentLat, _currentLon),
                 initialZoom: 14.00,
@@ -920,9 +965,11 @@ class _DashboardPageState extends State<DashboardPage> {
             child: Row(
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
-                _buildLegendItem(Colors.red, 'User Location'),
+                _buildLegendItem(Colors.red, 'User Location',
+                    () => _flyTo(_currentLat, _currentLon)),
                 const SizedBox(width: 20),
-                _buildLegendItem(Colors.blue, 'Ombro Location'),
+                _buildLegendItem(Colors.blue, 'Ombro Location',
+                    () => _flyToOmbroLocations()),
               ],
             ),
           ),
@@ -931,13 +978,27 @@ class _DashboardPageState extends State<DashboardPage> {
     );
   }
 
-  Widget _buildLegendItem(Color color, String label) {
-    return Row(
-      children: [
-        Icon(Icons.location_on, color: color, size: 20),
-        const SizedBox(width: 4),
-        Text(label, style: const TextStyle(fontSize: 12)),
-      ],
+  void _flyTo(double lat, double lon) {
+    animatedMapMove(LatLng(lat, lon), 15.0);
+  }
+
+  void _flyToOmbroLocations() {
+    if (_selectedOmbrocoordinats.isNotEmpty) {
+      final firstOmbro = _selectedOmbrocoordinats.first;
+      _flyTo(firstOmbro.lat, firstOmbro.lon);
+    }
+  }
+
+  Widget _buildLegendItem(Color color, String label, VoidCallback onTap) {
+    return GestureDetector(
+      onTap: onTap,
+      child: Row(
+        children: [
+          Icon(Icons.location_on, color: color, size: 20),
+          const SizedBox(width: 4),
+          Text(label, style: const TextStyle(fontSize: 12)),
+        ],
+      ),
     );
   }
 
@@ -999,7 +1060,7 @@ class _DashboardPageState extends State<DashboardPage> {
                 width: double.infinity, // Make the container take full width
                 height: 200.0, // Set a fixed height for the image
                 child: Image.network(
-                  'https://mobilepro.srs-ssms.com/storage/app/public/qc/grading_mill/${ombro.images}',
+                  'https://management.srs-ssms.com/storage/${ombro.images}',
                   fit: BoxFit.cover, // Ensure the image covers the container
                 ),
               ),

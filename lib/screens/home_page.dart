@@ -156,10 +156,6 @@ class _DashboardPageState extends State<DashboardPage> {
   double _currentLat = 0.0;
   double _currentLon = 0.0;
 
-  String? _selectedRegion;
-  String? _selectedWilayah;
-  String? _selectedEstate;
-
   String locationMessage = "Fetching location...";
   @override
   void initState() {
@@ -266,9 +262,6 @@ class _DashboardPageState extends State<DashboardPage> {
     await DataCache().fetchData();
     setState(() {
       _regions = DataCache().regions;
-      _selectedRegion = null;
-      _selectedWilayah = null;
-      _selectedEstate = null;
       _wilayahs = [];
       _estates = [];
       _afdelings = [];
@@ -281,9 +274,6 @@ class _DashboardPageState extends State<DashboardPage> {
         field.reset();
       });
 
-      _selectedRegion = null;
-      _selectedWilayah = null;
-      _selectedEstate = null;
       _wilayahs = [];
       _estates = [];
       _afdelings = [];
@@ -301,7 +291,6 @@ class _DashboardPageState extends State<DashboardPage> {
 
   void _onRegionChanged(String? value) {
     setState(() {
-      _selectedRegion = value;
       if (_regions.isNotEmpty) {
         final region = _regions.firstWhere(
           (region) => region['id'].toString() == value,
@@ -311,16 +300,16 @@ class _DashboardPageState extends State<DashboardPage> {
         // Use `region['wilayahs'] ?? []` to ensure it's not null
         _wilayahs = region['wilayahs'] as List<dynamic>? ?? [];
       }
-      _selectedWilayah = null;
       _estates = [];
-      _selectedEstate = null;
       _afdelings = [];
+      _selectedEstatePlots = [];
+      _selectedOmbrocoordinats = [];
+      _initializeLocation();
     });
   }
 
   void _onWilayahChanged(String? value) {
     setState(() {
-      _selectedWilayah = value;
       if (_wilayahs.isNotEmpty) {
         final wilayah = _wilayahs.firstWhere(
           (wilayah) => wilayah['id'].toString() == value,
@@ -330,14 +319,15 @@ class _DashboardPageState extends State<DashboardPage> {
         // Use `wilayah['estates'] ?? []` to ensure it's not null
         _estates = wilayah['estates'] as List<dynamic>? ?? [];
       }
-      _selectedEstate = null;
       _afdelings = [];
+      _selectedEstatePlots = [];
+      _selectedOmbrocoordinats = [];
+      _initializeLocation();
     });
   }
 
   void _onEstateChanged(String? value) {
     setState(() {
-      _selectedEstate = value;
       if (_estates.isNotEmpty) {
         final estate = _estates.firstWhere(
           (estate) => estate['id'].toString() == value,
@@ -377,7 +367,7 @@ class _DashboardPageState extends State<DashboardPage> {
 
   double calculateDistance(LatLng start, LatLng end) {
     const Distance distance = Distance();
-    return distance.as(LengthUnit.Kilometer, start, end);
+    return distance.as(LengthUnit.Meter, start, end);
   }
 
   void _onSubmit() async {
@@ -444,7 +434,6 @@ class _DashboardPageState extends State<DashboardPage> {
     }
   }
 
-  @override
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -618,10 +607,11 @@ class _DashboardPageState extends State<DashboardPage> {
   }
 
   Widget _buildLocationInfoCard() {
-    double distanceInKm = calculateDistance(
+    double distanceInMeters = calculateDistance(
       LatLng(_currentLat, _currentLon),
       _selectedEstatePlots.isNotEmpty
-          ? LatLng(_selectedEstatePlots.last.lat, _selectedEstatePlots.last.lon)
+          ? LatLng(_selectedOmbrocoordinats.last.lat,
+              _selectedOmbrocoordinats.last.lon)
           : const LatLng(0, 0),
     );
 
@@ -634,11 +624,11 @@ class _DashboardPageState extends State<DashboardPage> {
         child: Padding(
           padding: const EdgeInsets.all(16.0),
           child: Text(
-            distanceInKm > 25
-                ? 'Lokasi anda terlalu jauh dengan lokasi aktual ${distanceInKm.toStringAsFixed(2)} Km'
-                : 'Lokasi anda berada tepat dengan lokasi aktual ${distanceInKm.toStringAsFixed(2)} Km',
-            style:
-                TextStyle(color: distanceInKm > 25 ? Colors.red : Colors.green),
+            distanceInMeters > 25 // Adjust threshold if necessary
+                ? 'Lokasi anda terlalu jauh dengan lokasi aktual ${distanceInMeters.toStringAsFixed(2)} meter'
+                : 'Lokasi anda berada tepat dengan lokasi aktual ${distanceInMeters.toStringAsFixed(2)} meter',
+            style: TextStyle(
+                color: distanceInMeters > 25 ? Colors.red : Colors.green),
           ),
         ),
       ),
@@ -650,30 +640,31 @@ class _DashboardPageState extends State<DashboardPage> {
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(15)),
       elevation: 4,
       color: Colors.white,
-      child: Padding(
-        padding: const EdgeInsets.all(16.0),
-        child: SizedBox(
-          width: double.infinity,
-          height: 400.0,
-          child: FlutterMap(
-            mapController: MapController(),
-            options: MapOptions(
-              initialCenter: LatLng(_selectedEstatePlots.first.lat,
-                  _selectedEstatePlots.first.lon),
-              initialZoom: 11.30,
-              interactionOptions: const InteractionOptions(
-                flags: InteractiveFlag.all,
-                enableMultiFingerGestureRace: true,
-              ),
-              minZoom: 3,
-              maxZoom: 18,
+      child: SizedBox(
+        width: double.infinity,
+        height: 400.0,
+        child: FlutterMap(
+          mapController: MapController(),
+          options: MapOptions(
+            initialCenter: LatLng(_currentLat, _currentLon),
+            initialZoom: 14.00,
+            minZoom: 3,
+            maxZoom: 18,
+            interactionOptions: const InteractionOptions(
+              flags: InteractiveFlag.all,
+              enableMultiFingerGestureRace: true,
+              rotationThreshold: 15.0,
+              pinchZoomThreshold: 0.3,
+              pinchMoveThreshold: 30.0,
+              scrollWheelVelocity: 0.005,
             ),
-            children: [
-              _buildTileLayer(),
-              _buildPolygonLayer(),
-              _buildMarkerLayer(),
-            ],
           ),
+          children: [
+            _buildTileLayer(),
+            _buildPolygonLayer(),
+            _buildMarkerLayer(),
+            _buildMarkercurrentLocation(),
+          ],
         ),
       ),
     );
@@ -714,6 +705,20 @@ class _DashboardPageState extends State<DashboardPage> {
                     color: Colors.red, size: 30.0),
               ))
           .toList(),
+    );
+  }
+
+  MarkerLayer _buildMarkercurrentLocation() {
+    return MarkerLayer(
+      markers: [
+        Marker(
+          point: LatLng(_currentLat, _currentLon),
+          width: 30.0,
+          height: 30.0,
+          child: const Icon(Icons.location_on,
+              color: Color.fromARGB(255, 51, 204, 110), size: 30.0),
+        ),
+      ],
     );
   }
 

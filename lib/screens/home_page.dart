@@ -11,6 +11,7 @@ import 'package:http/http.dart' as http; // Import for http requests
 import 'package:fluttertoast/fluttertoast.dart';
 import 'package:lottie/lottie.dart' as lottie;
 import 'package:hive_flutter/hive_flutter.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import '../utils/models.dart'; // Import your History model
 import 'package:flutter/services.dart'; // Import for Clipboard
 import 'package:flutter_map/flutter_map.dart';
@@ -139,6 +140,34 @@ class DataCache {
   Future<void> clearData() async {
     if (_historyBox == null) await loadSubmittedData();
     await _historyBox?.clear();
+  }
+
+  List<Map<String, dynamic>> _savedData = [];
+
+  Future<void> addSavedData(Map<String, dynamic> data) async {
+    _savedData.add(data);
+    await _saveSavedDataToStorage();
+  }
+
+  Future<void> _saveSavedDataToStorage() async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setString('saved_data', json.encode(_savedData));
+  }
+
+  Future<void> loadSavedData() async {
+    final prefs = await SharedPreferences.getInstance();
+    final savedDataString = prefs.getString('saved_data');
+    if (savedDataString != null) {
+      _savedData =
+          List<Map<String, dynamic>>.from(json.decode(savedDataString));
+    }
+  }
+
+  List<Map<String, dynamic>> get savedData => _savedData;
+
+  Future<void> removeSavedData(int index) async {
+    _savedData.removeAt(index);
+    await _saveSavedDataToStorage();
   }
 }
 
@@ -755,6 +784,40 @@ class _DashboardPageState extends State<DashboardPage>
     }
   }
 
+  void _onSaveData() async {
+    if (_formKey.currentState?.saveAndValidate() ?? false) {
+      final formData = _formKey.currentState?.value;
+      final dataToSave = {
+        'afd': _findNameById(
+            _afdelings, formData?['select_afdeling'] ?? '', 'nama'),
+        'est': _findNameById(_estates, formData?['select_estate'] ?? '', 'est'),
+        'ch': (formData?['value_curah_hujan'] ?? '').toString(),
+        'afd_id': formData?['select_afdeling'] ?? '',
+        'est_id': formData?['select_estate'] ?? '',
+        'timestamp': DateTime.now().toIso8601String(),
+      };
+
+      await DataCache().addSavedData(dataToSave);
+
+      Fluttertoast.showToast(
+        msg: "Data berhasil disimpan",
+        toastLength: Toast.LENGTH_SHORT,
+        gravity: ToastGravity.BOTTOM,
+        backgroundColor: Colors.green,
+        textColor: Colors.white,
+        fontSize: 16.0,
+      );
+
+      _resetFormAndFetchData();
+    }
+  }
+
+  String _findNameById(List<dynamic> list, String id, String nameField) {
+    final item =
+        list.firstWhere((element) => element['id'] == id, orElse: () => null);
+    return item != null ? item[nameField] : '';
+  }
+
   @override
   @override
   void dispose() {
@@ -762,6 +825,7 @@ class _DashboardPageState extends State<DashboardPage>
     super.dispose();
   }
 
+  @override
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: _buildAppBar(),
@@ -779,7 +843,45 @@ class _DashboardPageState extends State<DashboardPage>
               style: TextStyle(fontSize: 18.0, fontWeight: FontWeight.bold)),
         ],
       ),
+      actions: [
+        IconButton(
+          icon: const Icon(Icons.cloud_upload),
+          onPressed: _uploadSavedData,
+        ),
+      ],
     );
+  }
+
+  void _uploadSavedData() async {
+    final savedData = DataCache().savedData;
+    if (savedData.isEmpty) {
+      Fluttertoast.showToast(msg: "No saved data to upload");
+      return;
+    }
+
+    for (var data in savedData) {
+      final response = await http.post(
+        Uri.parse('https://management.srs-ssms.com/api/curah_hujan'),
+        body: {
+          'email': 'j',
+          'password': 'j',
+          'afd': data['afd'],
+          'est': data['est'],
+          'ch': data['ch'],
+          'afd_id': data['afd_id'],
+          'est_id': data['est_id'],
+        },
+      );
+
+      if (response.statusCode == 200) {
+        await DataCache().removeSavedData(savedData.indexOf(data));
+      } else {
+        Fluttertoast.showToast(msg: "Failed to upload some data");
+        return;
+      }
+    }
+
+    Fluttertoast.showToast(msg: "All saved data uploaded successfully");
   }
 
   Widget _buildBody() {
@@ -916,18 +1018,25 @@ class _DashboardPageState extends State<DashboardPage>
   }
 
   Widget _buildFormButtons() {
-    return Row(
-      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+    return Wrap(
+      spacing: 8.0,
+      runSpacing: 8.0,
+      alignment: WrapAlignment.spaceBetween,
       children: [
         ElevatedButton.icon(
           onPressed: _resetFormAndFetchData,
-          icon: const Icon(Icons.refresh),
-          label: const Text('Reset Pilihan'),
+          icon: const Icon(Icons.refresh, size: 18),
+          label: const Text('Reset', style: TextStyle(fontSize: 12)),
         ),
         ElevatedButton.icon(
           onPressed: _isSubmitButtonEnabled ? _onSubmit : null,
-          icon: const Icon(Icons.send),
-          label: const Text('Kirim Data'),
+          icon: const Icon(Icons.send, size: 18),
+          label: const Text('Kirim', style: TextStyle(fontSize: 12)),
+        ),
+        ElevatedButton.icon(
+          onPressed: _isSubmitButtonEnabled ? _onSaveData : null,
+          icon: const Icon(Icons.save, size: 18),
+          label: const Text('Simpan', style: TextStyle(fontSize: 12)),
         ),
       ],
     );

@@ -21,6 +21,7 @@ import 'package:image_picker/image_picker.dart';
 import 'dart:io'; // For File class
 import 'package:http_parser/http_parser.dart';
 import 'dart:async';
+import './history_page.dart';
 
 void main() async {
   // Ensure that plugin services are initialized so that Hive can use them
@@ -186,8 +187,7 @@ class _DashboardPageState extends State<DashboardPage>
     with TickerProviderStateMixin {
   final _formKey = GlobalKey<FormBuilderState>();
   List<EstatePlot> _selectedEstatePlots = [];
-  List<Ombrocoordinat> _selectedOmbrocoordinats = [];
-  bool _isSubmitButtonEnabled = false;
+  final bool _isSubmitButtonEnabled = false;
 
   List<dynamic> _regions = [];
   List<dynamic> _wilayahs = [];
@@ -217,20 +217,8 @@ class _DashboardPageState extends State<DashboardPage>
       setState(() {
         _currentLat = position.latitude;
         _currentLon = position.longitude;
-        _updateDistanceToOmbro();
       });
     });
-  }
-
-  void _updateDistanceToOmbro() {
-    if (_selectedOmbrocoordinats.isNotEmpty) {
-      LatLng currentLocation = LatLng(_currentLat, _currentLon);
-      LatLng ombroLocation = LatLng(
-          _selectedOmbrocoordinats.last.lat, _selectedOmbrocoordinats.last.lon);
-      double distanceInMeters =
-          calculateDistance(currentLocation, ombroLocation);
-      _isSubmitButtonEnabled = distanceInMeters <= 25.0;
-    }
   }
 
   void animatedMapMove(LatLng destLocation, double destZoom) {
@@ -290,19 +278,6 @@ class _DashboardPageState extends State<DashboardPage>
           desiredAccuracy: LocationAccuracy.high);
       _currentLat = position.latitude;
       _currentLon = position.longitude;
-
-      setState(() {
-        LatLng currentLocation = LatLng(_currentLat, _currentLon);
-        LatLng lastPlotLocation = _selectedEstatePlots.isNotEmpty
-            ? LatLng(
-                _selectedEstatePlots.last.lat, _selectedEstatePlots.last.lon)
-            : const LatLng(0, 0); // Default location if no plot is selected
-
-        double distanceInKm =
-            calculateDistance(currentLocation, lastPlotLocation);
-        _isSubmitButtonEnabled =
-            distanceInKm <= 10.0; // Disable button if more than 1 km
-      });
     } catch (e) {
       // Handle location fetching error (e.g., user turned off location services)
       if (kDebugMode) {
@@ -381,7 +356,6 @@ class _DashboardPageState extends State<DashboardPage>
       _estates = [];
       _afdelings = [];
       _selectedEstatePlots = [];
-      _selectedOmbrocoordinats = [];
     });
 
     await _loadData();
@@ -415,7 +389,6 @@ class _DashboardPageState extends State<DashboardPage>
       _estates = [];
       _afdelings = [];
       _selectedEstatePlots = [];
-      _selectedOmbrocoordinats = [];
       _initializeLocation();
     });
   }
@@ -433,7 +406,6 @@ class _DashboardPageState extends State<DashboardPage>
       }
       _afdelings = [];
       _selectedEstatePlots = [];
-      _selectedOmbrocoordinats = [];
       _initializeLocation();
     });
   }
@@ -446,20 +418,30 @@ class _DashboardPageState extends State<DashboardPage>
           orElse: () => {'afdelings': [], 'estate_plots': []},
         );
 
-        _afdelings = estate['afdelings'] as List<dynamic>? ?? [];
-        _selectedEstatePlots = (estate['estate_plots'] as List<dynamic>? ?? [])
-            .map((plot) => EstatePlot(
-                  id: plot['id'],
-                  est: plot['est'],
-                  lat: plot['lat'],
-                  lon: plot['lon'],
-                ))
-            .toList();
+        if (estate is Map<String, dynamic>) {
+          _afdelings = (estate['afdelings'] as List<dynamic>? ?? [])
+              .map((afdeling) => Afdeling(
+                    id: afdeling['id'] ?? 0,
+                    nama: afdeling['nama'] ?? '',
+                    estate: afdeling['estate'] ?? 0,
+                    ombro_lon: afdeling['ombro_lon']?.toDouble(),
+                    ombro_lat: afdeling['ombro_lat']?.toDouble(),
+                    ombro_status: afdeling['ombro_status'] ?? '0',
+                    ombro_images: afdeling['ombro_images'],
+                  ))
+              .toList();
 
-        // Clear previously selected ombro coordinates
-        _selectedOmbrocoordinats = [];
+          _selectedEstatePlots =
+              (estate['estate_plots'] as List<dynamic>? ?? [])
+                  .map((plot) => EstatePlot(
+                        id: plot['id'],
+                        est: plot['est'],
+                        lat: plot['lat'],
+                        lon: plot['lon'],
+                      ))
+                  .toList();
+        }
 
-        // Recheck location distance after selecting a new estate
         _initializeLocation();
       }
     });
@@ -468,25 +450,13 @@ class _DashboardPageState extends State<DashboardPage>
   void _onAfdelingChanged(String? value) {
     setState(() {
       if (_afdelings.isNotEmpty) {
-        final afdeling = _afdelings.firstWhere(
-          (afdeling) => afdeling['id'].toString() == value,
-          orElse: () => {'ombro_afdeling': []},
-        );
+        // Check if the selected afdeling has empty ombro_lat AND ombro_lon
+        Afdeling selectedAfdeling = _afdelings
+            .firstWhere((afdeling) => afdeling.id.toString() == value);
+        bool hasEmptyOmbro = selectedAfdeling.ombro_lat == null &&
+            selectedAfdeling.ombro_lon == null;
 
-        _selectedOmbrocoordinats =
-            (afdeling['ombro_afdeling'] as List<dynamic>? ?? [])
-                .map((ombro) => Ombrocoordinat(
-                      id: ombro['id'],
-                      est: ombro['est'],
-                      afd: ombro['afd'],
-                      lat: ombro['lat'],
-                      lon: ombro['lon'],
-                      status: ombro['status'],
-                      images: ombro['images'],
-                    ))
-                .toList();
-
-        if (_selectedOmbrocoordinats.isEmpty) {
+        if (hasEmptyOmbro) {
           _showEmptyOmbroAlert();
         }
 
@@ -498,26 +468,54 @@ class _DashboardPageState extends State<DashboardPage>
   void _showEmptyOmbroAlert() {
     showDialog(
       context: context,
+      barrierDismissible: false,
       builder: (BuildContext context) {
         return AlertDialog(
-          title: const Text('Ombro Data Kosong'),
-          content: const Text(
-              'Tidak ada data ombro untuk afdeling ini. Silakan tambahkan data ombro terlebih dahulu.'),
+          shape:
+              RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+          title: Row(
+            children: [
+              Icon(Icons.warning_amber_rounded,
+                  color: Colors.orange[700], size: 28),
+              const SizedBox(width: 10),
+              const Text('Ombro Data Kosong',
+                  style: TextStyle(fontWeight: FontWeight.bold)),
+            ],
+          ),
+          content: const Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                'Tidak ada data ombro untuk afdeling ini. Silakan tambahkan data ombro terlebih dahulu.',
+                style: TextStyle(fontSize: 16),
+              ),
+              SizedBox(height: 20),
+              Text('Apakah Anda ingin menambahkan data sekarang?',
+                  style: TextStyle(fontStyle: FontStyle.italic)),
+            ],
+          ),
           actions: [
             TextButton(
-              child: const Text('Batal'),
-              onPressed: () {
-                Navigator.of(context).pop();
-              },
+              child: Text('Batal', style: TextStyle(color: Colors.grey[600])),
+              onPressed: () => Navigator.of(context).pop(),
             ),
-            TextButton(
-              child: const Text('Tambah'),
+            ElevatedButton(
+              style: ElevatedButton.styleFrom(
+                backgroundColor: Theme.of(context).primaryColor,
+                shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(10)),
+              ),
               onPressed: () {
                 Navigator.of(context).pop();
                 _showAddOmbroForm();
               },
+              child: const Text('Tambah',
+                  style: TextStyle(color: Color.fromARGB(255, 243, 243, 243))),
             ),
           ],
+          actionsPadding:
+              const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
         );
       },
     );
@@ -542,30 +540,6 @@ class _DashboardPageState extends State<DashboardPage>
                 child: Column(
                   mainAxisSize: MainAxisSize.min,
                   children: [
-                    FormBuilderDropdown<String>(
-                      name: 'estate',
-                      decoration: const InputDecoration(labelText: 'Estate'),
-                      items: _estates
-                          .map((estate) => DropdownMenuItem(
-                                value: estate['id'].toString(),
-                                child: Text(estate['est']),
-                              ))
-                          .toList(),
-                      onChanged: (value) => est = value ?? '',
-                      validator: FormBuilderValidators.required(),
-                    ),
-                    FormBuilderDropdown<String>(
-                      name: 'afdeling',
-                      decoration: const InputDecoration(labelText: 'Afdeling'),
-                      items: _afdelings
-                          .map((afdeling) => DropdownMenuItem(
-                                value: afdeling['id'].toString(),
-                                child: Text(afdeling['nama']),
-                              ))
-                          .toList(),
-                      onChanged: (value) => afd = value ?? '',
-                      validator: FormBuilderValidators.required(),
-                    ),
                     ElevatedButton(
                       child: const Text('Take Photo'),
                       onPressed: () async {
@@ -625,8 +599,7 @@ class _DashboardPageState extends State<DashboardPage>
                   onPressed: () {
                     if (formKey.currentState?.validate() ?? false) {
                       formKey.currentState?.save();
-                      _saveNewOmbroData(
-                          est, afd, _currentLat, _currentLon, base64Image);
+                      _saveNewOmbroData(_currentLat, _currentLon, base64Image);
                       Navigator.of(context).pop();
                     }
                   },
@@ -639,9 +612,10 @@ class _DashboardPageState extends State<DashboardPage>
     );
   }
 
-  void _saveNewOmbroData(String estId, String afdId, double lat, double lon,
-      String base64Image) async {
+  void _saveNewOmbroData(double lat, double lon, String base64Image) async {
     try {
+      // Validate afdId
+
       var imageData = base64Decode(base64Image);
 
       var request = http.MultipartRequest(
@@ -649,62 +623,74 @@ class _DashboardPageState extends State<DashboardPage>
         Uri.parse(
             'https://management.srs-ssms.com/api/input_data_newombro_location'),
       );
+      final formData = _formKey.currentState?.value;
+      final selectedEstateId = formData?['select_estate'] ?? '';
+      final selectedAfdelingId = formData?['select_afdeling'] ?? '';
 
+      final selectedEstate = _estates.firstWhere(
+        (estate) => estate['id'].toString() == selectedEstateId,
+        orElse: () => null,
+      );
+      final selectedAfdeling = _afdelings.firstWhere(
+        (afdeling) => afdeling.id.toString() == selectedAfdelingId,
+        orElse: () => null,
+      );
       // Adding the regular form fields
-      request.fields['est'] = estId;
-      request.fields['afd'] = afdId;
+      request.fields['est'] = selectedEstate?['est'] ?? '';
+      request.fields['afd'] = selectedAfdeling?.nama ?? '';
       request.fields['email'] = 'j';
       request.fields['password'] = 'j';
       request.fields['lat'] = lat.toString();
       request.fields['lon'] = lon.toString();
 
-      // Adding the image as a file field
-      request.files.add(
-        http.MultipartFile.fromBytes(
-          'image', // field name in the API
-          imageData,
-          filename: 'upload.jpg',
-          contentType: MediaType('image', 'jpeg'),
-        ),
-      );
-
-      // Sending the request
-      var response = await request.send();
-
-      // Log response details
+      // Logging form fields before sending
       if (kDebugMode) {
-        print('Response status: ${response.statusCode}');
+        print('Form fields: ${request.fields}');
       }
 
-      if (response.statusCode == 200) {
-        Fluttertoast.showToast(msg: "New ombro location added successfully");
-        // Refresh the data after successful upload
-        await _loadData();
-        setState(() {
-          // Explicitly set all dropdown values to null
-          _formKey.currentState?.fields['select_region']?.didChange(null);
-          _formKey.currentState?.fields['select_wilayah']?.didChange(null);
-          _formKey.currentState?.fields['select_estate']?.didChange(null);
-          _formKey.currentState?.fields['select_afdeling']?.didChange(null);
+      // Adding the image as a file field
+      // request.files.add(
+      //   http.MultipartFile.fromBytes(
+      //     'image',
+      //     imageData,
+      //     filename: 'upload.jpg',
+      //     contentType: MediaType('image', 'jpeg'),
+      //   ),
+      // );
 
-          // Force rebuild of the regional dropdown
-          _formKey.currentState?.fields['select_region']?.reset();
-        });
+      // // Sending the request
+      // var response = await request.send();
 
-        // Trigger a rebuild of the form
-        _formKey.currentState?.save();
-      } else {
-        // Handle error response
-        if (kDebugMode) {
-          print('Response reason: ${response.reasonPhrase}');
-        }
-        Fluttertoast.showToast(
-          msg: "Failed to add new ombro location: ${response.reasonPhrase}",
-          toastLength: Toast.LENGTH_LONG,
-        );
-      }
+      // // Log response details
+      // if (kDebugMode) {
+      //   print('Response status: ${response.statusCode}');
+      // }
+
+      // if (response.statusCode == 200) {
+      //   Fluttertoast.showToast(msg: "New ombro location added successfully");
+      //   await _loadData();
+      //   setState(() {
+      //     // Reset dropdown values
+      //     _formKey.currentState?.fields['select_region']?.didChange(null);
+      //     _formKey.currentState?.fields['select_wilayah']?.didChange(null);
+      //     _formKey.currentState?.fields['select_estate']?.didChange(null);
+      //     _formKey.currentState?.fields['select_afdeling']?.didChange(null);
+
+      //     _formKey.currentState?.fields['select_region']?.reset();
+      //     _mapController.move(LatLng(lat, lon), 15.0);
+      //   });
+
+      //   _formKey.currentState?.save();
+      // } else {
+      //   if (kDebugMode) {
+      //     print('Response reason: ${response.reasonPhrase}');
+      //   }
+      //   Fluttertoast.showToast(
+      //     msg: "Failed to add new ombro location: ${response.reasonPhrase}",
+      //     toastLength: Toast.LENGTH_LONG,
+      //   );
+      // }
     } catch (error) {
-      // Handle any errors that occur during the API call
       if (kDebugMode) {
         print('Error: $error');
       }
@@ -818,7 +804,6 @@ class _DashboardPageState extends State<DashboardPage>
     return item != null ? item[nameField] : '';
   }
 
-  @override
   @override
   void dispose() {
     _positionStreamSubscription.cancel();
@@ -971,25 +956,91 @@ class _DashboardPageState extends State<DashboardPage>
   Widget _buildDropdownRow(String name, String label, List<dynamic> items,
       Function(String?)? onChanged) {
     return Padding(
-      padding: const EdgeInsets.only(bottom: 20),
-      child: FormBuilderDropdown<String>(
-        name: name,
-        decoration: InputDecoration(
-          labelText: label,
-          border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
-          contentPadding:
-              const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-        ),
-        items: items.map<DropdownMenuItem<String>>((item) {
-          return DropdownMenuItem<String>(
-            value: item['id'].toString(),
-            child: Text(item['nama']),
-          );
-        }).toList(),
-        onChanged: onChanged,
-        validator:
-            FormBuilderValidators.compose([FormBuilderValidators.required()]),
-        menuMaxHeight: 200,
+      padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 16),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Icon(Icons.label, size: 18, color: Colors.grey[600]),
+              const SizedBox(width: 8),
+              Text(
+                label,
+                style: TextStyle(
+                  fontSize: 16,
+                  fontWeight: FontWeight.bold,
+                  color: Colors.grey[700],
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 8),
+          FormBuilderDropdown<String>(
+            name: name,
+            decoration: InputDecoration(
+              filled: true,
+              fillColor: Colors.grey[100],
+              border: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(12),
+                borderSide: BorderSide(color: Colors.grey[300]!),
+              ),
+              enabledBorder: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(12),
+                borderSide: BorderSide(color: Colors.grey[300]!),
+              ),
+              focusedBorder: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(12),
+                borderSide:
+                    BorderSide(color: Theme.of(context).primaryColor, width: 2),
+              ),
+              contentPadding:
+                  const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+              prefixIcon: Icon(Icons.list_alt, color: Colors.grey[600]),
+              suffixIcon: Icon(Icons.arrow_drop_down, color: Colors.grey[600]),
+            ),
+            items: items.map<DropdownMenuItem<String>>((item) {
+              if (item is Afdeling) {
+                return DropdownMenuItem<String>(
+                  value: item.id.toString(),
+                  child: Row(
+                    children: [
+                      Icon(Icons.circle, size: 10, color: Colors.grey[600]),
+                      const SizedBox(width: 8),
+                      Text(item.nama,
+                          style: TextStyle(color: Colors.grey[800])),
+                    ],
+                  ),
+                );
+              } else {
+                return DropdownMenuItem<String>(
+                  value: item['id'].toString(),
+                  child: Row(
+                    children: [
+                      Icon(Icons.circle, size: 10, color: Colors.grey[600]),
+                      const SizedBox(width: 8),
+                      Text(item['nama'],
+                          style: TextStyle(color: Colors.grey[800])),
+                    ],
+                  ),
+                );
+              }
+            }).toList(),
+            onChanged: onChanged,
+            validator: FormBuilderValidators.compose([
+              FormBuilderValidators.required(),
+              (value) {
+                if (value == null || value.isEmpty) {
+                  return '⚠️ This field is required';
+                }
+                return null;
+              },
+            ]),
+            menuMaxHeight: 300,
+            style: TextStyle(color: Colors.grey[800], fontSize: 16),
+            dropdownColor: Colors.white,
+            icon: const Icon(Icons.arrow_drop_down, size: 30),
+          ),
+        ],
       ),
     );
   }
@@ -999,20 +1050,28 @@ class _DashboardPageState extends State<DashboardPage>
       name: 'value_curah_hujan',
       decoration: InputDecoration(
         labelText: 'Curah Hujan Data',
-        border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
-        contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+        hintText: 'Masukan data',
+        prefixIcon: const Icon(Icons.water_drop, color: Colors.blue),
+        suffixText: 'mm',
+        border: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(12),
+          borderSide: BorderSide(color: Colors.blue.shade200),
+        ),
+        focusedBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(12),
+          borderSide: const BorderSide(color: Colors.blue, width: 2),
+        ),
+        filled: true,
+        fillColor: Colors.blue.shade50,
+        contentPadding:
+            const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
       ),
       keyboardType: const TextInputType.numberWithOptions(decimal: true),
+      style: const TextStyle(fontSize: 16),
       validator: FormBuilderValidators.compose([
-        FormBuilderValidators.required(),
-        FormBuilderValidators.numeric(),
-        (value) {
-          final regex = RegExp(r'^\d*\.?\d*');
-          if (!regex.hasMatch(value ?? '')) {
-            return 'Please enter a valid decimal number';
-          }
-          return null;
-        },
+        FormBuilderValidators.required(errorText: 'This field is required'),
+        FormBuilderValidators.numeric(errorText: 'Please enter a valid number'),
+        FormBuilderValidators.max(1000, errorText: 'Maximum value is 1000 mm'),
       ]),
     );
   }
@@ -1043,14 +1102,12 @@ class _DashboardPageState extends State<DashboardPage>
   }
 
   Widget _buildLocationInfoCard() {
-    double distanceInMeters = _selectedOmbrocoordinats.isNotEmpty
-        ? calculateDistance(
-            LatLng(_currentLat, _currentLon),
-            LatLng(_selectedOmbrocoordinats.last.lat,
-                _selectedOmbrocoordinats.last.lon),
-          )
-        : 0.0;
-
+    double distanceInMeters = calculateDistance(
+      LatLng(_currentLat, _currentLon),
+      _selectedEstatePlots.isNotEmpty
+          ? LatLng(_selectedEstatePlots.last.lat, _selectedEstatePlots.last.lon)
+          : const LatLng(0, 0),
+    );
     return GestureDetector(
       onLongPress: _copyLocationToClipboard,
       child: Card(
@@ -1128,9 +1185,27 @@ class _DashboardPageState extends State<DashboardPage>
   }
 
   void _flyToOmbroLocations() {
-    if (_selectedOmbrocoordinats.isNotEmpty) {
-      final firstOmbro = _selectedOmbrocoordinats.first;
-      _flyTo(firstOmbro.lat, firstOmbro.lon);
+    if (_afdelings.isNotEmpty) {
+      final validAfdelings = _afdelings
+          .where((afdeling) =>
+              afdeling.ombro_lat != null && afdeling.ombro_lon != null)
+          .toList();
+
+      if (validAfdelings.isNotEmpty) {
+        // Print the valid afdelings for debugging
+        print('Ombro Afdelings: ${validAfdelings.toString()}');
+
+        // For simplicity, you can fly to the first valid location
+        final firstAfdeling = validAfdelings.first;
+        final targetLat = firstAfdeling.ombro_lat!;
+        final targetLon = firstAfdeling.ombro_lon!;
+        _flyTo(targetLat, targetLon);
+        // Use your map controller to fly to the coordinates (assuming _mapController is your MapController)
+        _mapController.move(LatLng(targetLat, targetLon),
+            15.0); // Zoom level 15.0 or adjust as needed
+      } else {
+        Fluttertoast.showToast(msg: "Ombro lokasi tidak ditemukan.");
+      }
     }
   }
 
@@ -1174,41 +1249,43 @@ class _DashboardPageState extends State<DashboardPage>
 
   MarkerLayer _buildMarkerLayer() {
     return MarkerLayer(
-      markers: _selectedOmbrocoordinats
-          .map((ombro) => Marker(
-                point: LatLng(ombro.lat, ombro.lon),
+      markers: _afdelings
+          .where((afdeling) =>
+              afdeling.ombro_lat != null && afdeling.ombro_lon != null)
+          .map((afdeling) => Marker(
+                point: LatLng(afdeling.ombro_lat!, afdeling.ombro_lon!),
                 width: 30.0,
                 height: 30.0,
                 child: GestureDetector(
                   onTap: () {
-                    _showMarkerDetails(context, ombro);
+                    _showMarkerDetails(context, afdeling);
                   },
                   child: const Icon(Icons.location_on,
-                      color: Colors.blue, size: 30.0), // Changed to blue
+                      color: Colors.blue, size: 30.0),
                 ),
               ))
           .toList(),
     );
   }
 
-  void _showMarkerDetails(BuildContext context, Ombrocoordinat ombro) {
+  void _showMarkerDetails(BuildContext context, Afdeling afdeling) {
     showDialog(
       context: context,
       builder: (BuildContext context) {
         return AlertDialog(
-          title: const Text('Marker Ombro Lokasi'),
+          title: Text('Ombro Location - ${afdeling.nama}'),
           content: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             mainAxisSize: MainAxisSize.min,
             children: <Widget>[
-              SizedBox(
-                width: double.infinity, // Make the container take full width
-                height: 200.0, // Set a fixed height for the image
-                child: Image.network(
-                  'https://management.srs-ssms.com/storage/${ombro.images}',
-                  fit: BoxFit.cover, // Ensure the image covers the container
+              Text('Latitude: ${afdeling.ombro_lat}'),
+              Text('Longitude: ${afdeling.ombro_lon}'),
+              if (afdeling.ombro_images != null)
+                Image.network(
+                  'https://management.srs-ssms.com/storage/${afdeling.ombro_images}',
+                  fit: BoxFit.cover,
+                  height: 200,
                 ),
-              ),
             ],
           ),
           actions: <Widget>[
@@ -1289,194 +1366,5 @@ class _DashboardPageState extends State<DashboardPage>
         const SnackBar(content: Text('Text copied to clipboard')),
       );
     });
-  }
-}
-
-class HistoryPage extends StatefulWidget {
-  const HistoryPage({super.key});
-
-  @override
-  // ignore: library_private_types_in_public_api
-  _HistoryPageState createState() => _HistoryPageState();
-}
-
-class _HistoryPageState extends State<HistoryPage> {
-  List<History> cachedData = [];
-  List<History> filteredData = [];
-  final TextEditingController _filterController = TextEditingController();
-  Box<History>? historyBox;
-
-  @override
-  void initState() {
-    super.initState();
-    _initHiveBox();
-    _loadData();
-    _filterController.addListener(_filterData);
-  }
-
-  Future<void> _initHiveBox() async {
-    try {
-      if (Hive.isBoxOpen('historyBox')) {
-        historyBox = Hive.box<History>('historyBox');
-      } else {
-        historyBox = await Hive.openBox<History>('historyBox');
-      }
-    } catch (e) {
-      if (kDebugMode) {
-        print('Error opening Hive box: $e');
-      }
-    }
-  }
-
-  Future<void> _loadData() async {
-    try {
-      await DataCache().loadSubmittedData();
-
-      final data = DataCache().getData();
-      setState(() {
-        cachedData = data;
-        filteredData = cachedData;
-      });
-    } catch (e) {
-      if (kDebugMode) {
-        print('Error loading data: $e');
-      }
-      setState(() {
-        cachedData = [];
-        filteredData = [];
-      });
-    }
-  }
-
-  void _filterData() {
-    final query = _filterController.text.toLowerCase();
-    setState(() {
-      filteredData = cachedData.where((history) {
-        return history.est.toLowerCase().contains(query);
-      }).toList();
-    });
-  }
-
-  Future<void> _deleteItem(int index) async {
-    if (historyBox != null) {
-      try {
-        // Find the actual index in the Hive box using the object reference
-        final historyToDelete = filteredData[index];
-        final int hiveIndex = cachedData.indexOf(historyToDelete);
-
-        if (hiveIndex != -1) {
-          // Ensure the item exists in the box
-          await historyBox!.deleteAt(hiveIndex); // Delete the item from Hive
-
-          setState(() {
-            cachedData.removeAt(hiveIndex); // Update cachedData first
-            filteredData =
-                List.from(cachedData); // Re-sync filteredData with cachedData
-          });
-
-          // Optionally, reload the data to ensure consistency
-          await _loadData();
-        } else {
-          debugPrint('Error: Item not found in Hive box.');
-        }
-      } catch (e) {
-        debugPrint('Error deleting item: $e');
-      }
-    }
-  }
-
-  Future<void> _clearData() async {
-    if (historyBox != null) {
-      try {
-        await historyBox!.clear();
-        setState(() {
-          cachedData.clear();
-          filteredData.clear();
-        });
-      } catch (e) {
-        if (kDebugMode) {
-          print('Error clearing Hive box: $e');
-        }
-      }
-    }
-  }
-
-  @override
-  void dispose() {
-    _filterController.dispose();
-    super.dispose();
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(
-        title: Row(
-          children: [
-            Image.asset(
-              'assets/images/LOGO-SRS.png',
-              width: 40,
-              height: 40,
-            ),
-            const SizedBox(width: 10),
-            const Text(
-              'History',
-              style: TextStyle(fontSize: 16.0),
-            ),
-          ],
-        ),
-        bottom: PreferredSize(
-          preferredSize: const Size.fromHeight(50.0),
-          child: Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 16.0),
-            child: TextField(
-              controller: _filterController,
-              decoration: InputDecoration(
-                labelText: 'Cari Estate',
-                border: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(10),
-                ),
-                contentPadding: const EdgeInsets.symmetric(horizontal: 16.0),
-              ),
-              onChanged: (value) => _filterData(),
-            ),
-          ),
-        ),
-      ),
-      body: ListView.builder(
-        itemCount: filteredData.length,
-        itemBuilder: (context, index) {
-          final history = filteredData[index];
-          return Card(
-            margin: const EdgeInsets.symmetric(vertical: 8.0, horizontal: 16.0),
-            child: SizedBox(
-              height: 100,
-              child: Row(
-                children: [
-                  Expanded(
-                    child: ListTile(
-                      title: Text("${history.afd} - ${history.est}"),
-                      subtitle: Text("Curah Hujan: ${history.ch}"),
-                    ),
-                  ),
-                  IconButton(
-                    tooltip: 'Hapus History',
-                    icon: const Icon(Icons.delete),
-                    onPressed: () {
-                      _deleteItem(index); // Delete the specific item
-                    },
-                  ),
-                ],
-              ),
-            ),
-          );
-        },
-      ),
-      floatingActionButton: FloatingActionButton(
-        onPressed: _clearData,
-        tooltip: 'Hapus Semua Data',
-        child: const Icon(Icons.delete_forever),
-      ),
-    );
   }
 }

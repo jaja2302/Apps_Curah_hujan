@@ -117,3 +117,45 @@ class Ombrocoordinat extends HiveObject {
     return 'ID: $id, EST: $est, AFD: $afd, Lat: $lat, Lon: $lon, Status: $status, Images: $images';
   }
 }
+
+@HiveType(typeId: 6)
+class Afdeling extends HiveObject {
+  @HiveField(0)
+  final int id;
+
+  @HiveField(1)
+  final String nama;
+
+  @HiveField(2)
+  final int estate;
+
+  @HiveField(3)
+  // ignore: non_constant_identifier_names
+  final double? ombro_lon;
+
+  @HiveField(4)
+  // ignore: non_constant_identifier_names
+  final double? ombro_lat;
+
+  @HiveField(5)
+  // ignore: non_constant_identifier_names
+  final String ombro_status;
+
+  @HiveField(6)
+  // ignore: non_constant_identifier_names
+  final String? ombro_images;
+
+  Afdeling({
+    required this.id,
+    required this.nama,
+    required this.estate,
+    // ignore: non_constant_identifier_names
+    this.ombro_lon,
+    // ignore: non_constant_identifier_names
+    this.ombro_lat,
+    // ignore: non_constant_identifier_names
+    required this.ombro_status,
+    // ignore: non_constant_identifier_names
+    this.ombro_images,
+  });
+}
